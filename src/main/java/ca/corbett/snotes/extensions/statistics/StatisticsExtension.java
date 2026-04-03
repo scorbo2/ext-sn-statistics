@@ -30,8 +30,8 @@ public class StatisticsExtension extends SnotesExtension {
 
     /**
      * We must supply a no-arg constructor to be invoked by ExtensionManager.
-     * We can load jar resources only here or in loadJarResources() - after we
-     * are instantiated, our ClassLoader is closed.
+     * We can load jar resources only during construction or in loadJarResources();
+     * after loadJarResources() completes, our ClassLoader is closed.
      */
     public StatisticsExtension() {
         extInfo = AppExtensionInfo.fromExtensionJar(getClass(), extInfoLocation);
