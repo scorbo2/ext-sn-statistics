@@ -163,8 +163,7 @@ class StatisticsUtilTest {
         // note that there's a three-way tie in our test data between "don't stop", "stop believing",
         // and "don't stop believing", all with count 3. In the event of a tie, we prioritize
         // the longer phrase, so we should get "don't stop believing" as the top result.
-        // The order of the other two is nondeterministic since they come from a HashMap, so
-        // we won't assert that here.
+        // This test only asks for the top 1 phrase, so we only assert that highest-ranked result here.
         assertEquals("don't stop believing", topPhrases.get(0).phrase());
         assertEquals(3, topPhrases.get(0).occurrenceCount());
     }
