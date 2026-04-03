@@ -9,4 +9,13 @@ package ca.corbett.snotes.extensions.statistics;
  * @since Snotes 2.0
  */
 public record Phrase(String phrase, int occurrenceCount) {
+
+    public Phrase {
+        if (phrase == null) {
+            throw new NullPointerException("phrase cannot be null");
+        }
+        if (occurrenceCount < 0) {
+            throw new IllegalArgumentException("occurrenceCount cannot be negative");
+        }
+    }
 }
