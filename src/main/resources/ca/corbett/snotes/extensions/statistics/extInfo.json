@@ -1,0 +1,9 @@
+{
+  "name": "Statistics",
+  "author": "steve@corbett.ca",
+  "version": "2.0.0",
+  "targetAppName": "Snotes",
+  "targetAppVersion": "2.0",
+  "shortDescription": "Shows statistics about your notes over time.",
+  "longDescription": "Shows word/note/phrase counts from your notes, organized over time."
+}
