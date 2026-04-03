@@ -34,6 +34,19 @@ class StatisticsUtilTest {
     }
 
     @Test
+    public void countWords_withOnlyPunctuation_shouldReturnZero() {
+        // GIVEN a note that contains only punctuation:
+        Note note = new Note();
+        note.setText("!@#$%^&*()");
+
+        // WHEN we countWords for this note:
+        int count = StatisticsUtil.countWords(note);
+
+        // THEN it should return zero, because there are no actual words:
+        assertEquals(0, count);
+    }
+
+    @Test
     public void countWords_withRegularText_shouldReturnCorrectCount() {
         // GIVEN a note with regular text, including punctuation and contractions:
         Note note = new Note();
@@ -166,5 +179,21 @@ class StatisticsUtilTest {
         // This test only asks for the top 1 phrase, so we only assert that highest-ranked result here.
         assertEquals("don't stop believing", topPhrases.get(0).phrase());
         assertEquals(3, topPhrases.get(0).occurrenceCount());
+    }
+
+    @Test
+    public void findTopNPhrases_withAllEmptyNotes_shouldReturnEmptyList() {
+        // GIVEN a list of notes that are all empty or null:
+        Note note1 = new Note();
+        note1.setText("");
+        Note note2 = new Note();
+        note2.setText(null);
+        List<Note> notes = List.of(note1, note2);
+
+        // WHEN we find the top 5 phrases:
+        List<Phrase> topPhrases = StatisticsUtil.findTopNPhrases(notes, 5);
+
+        // THEN it should return an empty list, because there are no valid phrases to count:
+        assertEquals(0, topPhrases.size());
     }
 }

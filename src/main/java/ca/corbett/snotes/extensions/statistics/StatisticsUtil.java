@@ -29,11 +29,18 @@ public class StatisticsUtil {
 
         // Replace everything that isn't a letter, number, or apostrophe with a space, then split on whitespace:
         // (we include apostrophes so that words like "isn't" don't get split into "isn t").
-        String[] words = note.getText()
+        String normalizedText = note.getText()
                              .replaceAll("[^\\w']", " ") // keep letters, numbers, apostrophes; turn rest into spaces
-                             .trim() // remove leading/trailing spaces
-                             .split("\\s+"); // split on one or more whitespace characters
+                                    .trim(); // remove leading/trailing spaces
 
+        // If the normalization left us with nothing, then we have zero words:
+        // (this can happen for punctuation-only text like "!!!")
+        if (normalizedText.isBlank()) {
+            return 0;
+        }
+
+        // Now we can split on whitespace and count the words:
+        String[] words = normalizedText.split("\\s+");
         return words.length;
     }
 
@@ -123,9 +130,19 @@ public class StatisticsUtil {
         Map<String, Integer> phraseCounts = new HashMap<>();
         for (Note note : notes) {
 
+            // Skip notes with no text:
+            if (note.getText() == null || note.getText().isBlank()) {
+                continue;
+            }
+
             // We don't care about case for this search, and we should strip out punctuation:
             String text = note.getText().toLowerCase(Locale.ROOT);
             text = text.replaceAll("[^\\w']", " "); // keep apostrophes! "don't", "isn't", etc.
+
+            // If the normalization left us with nothing, then we have no phrases to count:
+            if (text.isBlank()) {
+                continue;
+            }
 
             // Now we can split on whitespace:
             String[] words = text.split("\\s+");
