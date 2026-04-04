@@ -20,18 +20,18 @@ public class StatisticsUtil {
     }
 
     /**
-     * For the given text, counts the number of words it contains and returns that count as an integer.
+     * For the given Note, examines the text and returns the count of words within it.
      */
-    public static int countWords(String text) {
-        if (text == null || text.isBlank()) {
+    public static int countWords(Note note) {
+        if (note == null || note.getText() == null || note.getText().isBlank()) {
             return 0; // easy check
         }
 
         // Replace everything that isn't a letter, number, or apostrophe with a space, then split on whitespace:
         // (we include apostrophes so that words like "isn't" don't get split into "isn t").
-        String normalizedText = text
-                .replaceAll("[^\\w']", " ") // keep letters, numbers, apostrophes; turn rest into spaces
-                .trim(); // remove leading/trailing spaces
+        String normalizedText = note.getText()
+                             .replaceAll("[^\\w']", " ") // keep letters, numbers, apostrophes; turn rest into spaces
+                                    .trim(); // remove leading/trailing spaces
 
         // If the normalization left us with nothing, then we have zero words:
         // (this can happen for punctuation-only text like "!!!")
@@ -42,17 +42,6 @@ public class StatisticsUtil {
         // Now we can split on whitespace and count the words:
         String[] words = normalizedText.split("\\s+");
         return words.length;
-    }
-
-    /**
-     * For the given Note, examines the text and returns the count of words within it.
-     */
-    public static int countWords(Note note) {
-        if (note == null || note.getText() == null || note.getText().isBlank()) {
-            return 0; // easy check
-        }
-
-        return countWords(note.getText());
     }
 
     /**
@@ -141,14 +130,14 @@ public class StatisticsUtil {
         Map<String, Integer> phraseCounts = new HashMap<>();
         for (Note note : notes) {
 
-            // Skip null notes, and notes with no text:
-            if (note == null || note.getText() == null || note.getText().isBlank()) {
+            // Skip notes with no text:
+            if (note.getText() == null || note.getText().isBlank()) {
                 continue;
             }
 
             // We don't care about case for this search, and we should strip out punctuation:
             String text = note.getText().toLowerCase(Locale.ROOT);
-            text = text.replaceAll("[^\\w']", " ").trim(); // keep apostrophes! "don't", "isn't", etc.
+            text = text.replaceAll("[^\\w']", " "); // keep apostrophes! "don't", "isn't", etc.
 
             // If the normalization left us with nothing, then we have no phrases to count:
             if (text.isBlank()) {
@@ -178,8 +167,8 @@ public class StatisticsUtil {
                                if (cmp != 0) { return cmp; }
 
                                // In the event of a tie, take the longer phrase first (since it's more specific):
-                               return Integer.compare(countWords(p2.phrase()),
-                                                      countWords(p1.phrase()));
+                               return Integer.compare(p2.phrase().length(),
+                                                      p1.phrase().length());
                            })
                            .limit(n)
                            .toList();
