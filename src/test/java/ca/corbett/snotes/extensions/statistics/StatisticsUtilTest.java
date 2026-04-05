@@ -175,14 +175,18 @@ class StatisticsUtilTest {
 
     @Test
     public void findPhrases_shouldStripPunctuationAndNormalizeToLowercase() {
-        // GIVEN notes where the same phrase appears with different cases and punctuation:
+        // GIVEN four notes each containing just "hello world" with different cases and punctuation:
         Note note1 = new Note();
-        note1.setText("Hello, World! Hello, World!");
+        note1.setText("Hello, World!");
         Note note2 = new Note();
-        note2.setText("hello world! hello world!");
+        note2.setText("hello world!");
+        Note note3 = new Note();
+        note3.setText("HELLO WORLD.");
+        Note note4 = new Note();
+        note4.setText("hello, world");
 
         // WHEN we call findPhrases:
-        PhraseList result = StatisticsUtil.findPhrases(List.of(note1, note2));
+        PhraseList result = StatisticsUtil.findPhrases(List.of(note1, note2, note3, note4));
 
         // THEN punctuation should be stripped and text normalized to lowercase,
         // so all four occurrences count towards the same normalized phrase "hello world":
@@ -227,5 +231,44 @@ class StatisticsUtilTest {
         // The most common 2-word phrase should be first:
         assertEquals("hello world", filtered.get(0).phrase());
         assertEquals(3, filtered.get(0).occurrenceCount());
+    }
+
+    @Test
+    public void findPhrases_shouldPreserveApostrophes() {
+        // GIVEN notes where words contain apostrophes:
+        Note note1 = new Note();
+        note1.setText("isn't it great isn't it great");
+        Note note2 = new Note();
+        note2.setText("isn't it great");
+
+        // WHEN we call findPhrases:
+        PhraseList result = StatisticsUtil.findPhrases(List.of(note1, note2));
+
+        // THEN apostrophes should be preserved so "isn't" is treated as one word,
+        // not split into "isn" and "t":
+        List<Phrase> filtered = result.filter(10, 2);
+        assertTrue(filtered.stream().anyMatch(p -> p.phrase().equals("isn't it")),
+                   "Expected phrase \"isn't it\" to be present");
+        assertEquals(3, filtered.stream()
+                                 .filter(p -> p.phrase().equals("isn't it"))
+                                 .findFirst().get().occurrenceCount(),
+                     "\"isn't it\" should occur 3 times across both notes");
+        assertFalse(filtered.stream().anyMatch(p -> p.phrase().startsWith("isn ") || p.phrase().contains(" t ")),
+                    "Apostrophe should not cause \"isn't\" to be split");
+    }
+
+    @Test
+    public void findPhrases_withWhitespaceOnlyNotes_shouldReturnEmptyPhraseList() {
+        // GIVEN notes with non-empty but whitespace-only text:
+        Note note1 = new Note();
+        note1.setText("   ");
+        Note note2 = new Note();
+        note2.setText("\t\n");
+
+        // WHEN we call findPhrases:
+        PhraseList result = StatisticsUtil.findPhrases(List.of(note1, note2));
+
+        // THEN no phrases should be returned because all note text is whitespace:
+        assertTrue(result.getPhrases().isEmpty());
     }
 }
