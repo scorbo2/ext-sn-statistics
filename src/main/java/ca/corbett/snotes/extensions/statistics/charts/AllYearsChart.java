@@ -3,8 +3,6 @@ package ca.corbett.snotes.extensions.statistics.charts;
 import ca.corbett.snotes.extensions.statistics.Statistics;
 import ca.corbett.snotes.extensions.statistics.StatisticsExtension;
 import ca.corbett.snotes.extensions.statistics.StatisticsUtil;
-import ca.corbett.snotes.model.Query;
-import ca.corbett.snotes.model.QueryFactory;
 
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -82,9 +80,8 @@ public class AllYearsChart extends JPanel {
         gbc.anchor = GridBagConstraints.WEST;
         gbc.insets = new Insets(4, 20, 4, 4);
         for (int year : stats.getUniqueYears()) {
-            Query yearQuery = QueryFactory.year(year);
-            String noteCount = String.format("%,d", stats.getTotalNoteCount());
-            String wordCount = String.format("%,d", stats.getTotalWordCount());
+            String noteCount = String.format("%,d", stats.getNoteCountByYear().getOrDefault(year, 0));
+            String wordCount = String.format("%,d", stats.getWordCountByYear().getOrDefault(year, 0));
             String label = String.format("<html><b>%d:</b> %s notes (%s words)</html>", year, noteCount, wordCount);
             add(new JLabel(label), gbc);
             gbc.gridy++;
