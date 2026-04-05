@@ -189,8 +189,15 @@ public class StatisticsUtil {
      * otherwise be normalized to a value very close to 0.
      */
     public static float normalizeValue(int value, int minValue, int maxValue) {
-        float normalized = (float)(value - minValue) / (maxValue - minValue);
-        if (value > 0 && normalized < 0.05f) {
+        if (value == 0) {
+            return 0f; // preserve the "0 means no data" contract
+        }
+        if (maxValue <= minValue) {
+            return 1f; // non-zero value with no valid range: use full intensity safely
+        }
+
+        float normalized = (float) (value - minValue) / (maxValue - minValue);
+        if (normalized < 0.05f) {
             return 0.05f; // enforce a minimum color intensity for non-zero values
         }
         return normalized;
