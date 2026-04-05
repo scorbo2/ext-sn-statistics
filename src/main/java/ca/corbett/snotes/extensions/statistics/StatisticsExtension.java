@@ -1,13 +1,20 @@
 package ca.corbett.snotes.extensions.statistics;
 
 import ca.corbett.extensions.AppExtensionInfo;
+import ca.corbett.extras.EnhancedAction;
 import ca.corbett.extras.gradient.ColorSelectionType;
+import ca.corbett.extras.progress.MultiProgressDialog;
+import ca.corbett.extras.progress.SimpleProgressAdapter;
 import ca.corbett.extras.properties.AbstractProperty;
 import ca.corbett.extras.properties.ColorProperty;
 import ca.corbett.snotes.AppConfig;
+import ca.corbett.snotes.Resources;
 import ca.corbett.snotes.extensions.SnotesExtension;
+import ca.corbett.snotes.ui.MainWindow;
+import ca.corbett.snotes.ui.actions.ActionGroup;
 
 import java.awt.Color;
+import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -112,19 +119,16 @@ public class StatisticsExtension extends SnotesExtension {
      * We will supply one action group for the main action panel.
      * At a minimum, we will expose our StatisticsDialog (once we have one).
      */
-    /* TODO uncomment when StatisticsDialog is implemented
     @Override
     public List<ActionGroup> getActionGroups() {
         ActionGroup group = new ActionGroup("Statistics", Resources.getIconStats());
         group.addAction(new StatsDialogAction());
         return List.of(group);
     }
-     */
 
     /**
      * A very simple action to launch our StatisticsDialog.
      */
-    /* TODO uncomment when StatisticsDialog is implemented
     private static class StatsDialogAction extends EnhancedAction {
 
         public StatsDialogAction() {
@@ -133,8 +137,37 @@ public class StatisticsExtension extends SnotesExtension {
 
         @Override
         public void actionPerformed(ActionEvent e) {
-            new StatisticsDialog().setVisible(true);
+            StatisticsLoaderThread loader = new StatisticsLoaderThread(MainWindow.getInstance().getDataManager());
+            loader.addProgressListener(new ProgressListener(loader));
+            String message = "Gathering statistics";
+            MultiProgressDialog dialog = new MultiProgressDialog(MainWindow.getInstance(), message);
+            dialog.runWorker(loader, true);
+
         }
     }
+
+    /**
+     * Listeners to our loader thread, and will show the StatisticsDialog when loading is complete.
+     * Our progress dialog will be visible while the loader is running, and the user will have
+     * a "cancel" button they can use if the loader runs too long. If we detect a cancel event,
+     * we simply do nothing here. User can try again later.
      */
+    private static class ProgressListener extends SimpleProgressAdapter {
+
+        private final StatisticsLoaderThread loader;
+
+        public ProgressListener(StatisticsLoaderThread loader) {
+            this.loader = loader;
+        }
+
+        @Override
+        public void progressCanceled() {
+            // User canceled; do nothing.
+        }
+
+        @Override
+        public void progressComplete() {
+            new StatisticsDialog(loader.getStatistics()).setVisible(true);
+        }
+    }
 }
