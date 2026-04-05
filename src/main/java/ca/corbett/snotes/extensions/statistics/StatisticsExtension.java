@@ -26,11 +26,6 @@ import java.util.List;
  *     <li>Phrase frequency - what are the most frequently used phrases?</li>
  *     <li>Note length distribution - how long are the user's notes over time?</li>
  * </ul>
- * <p>
- *     All statistics above can be gathered either for a specific time period,
- *     or from all notes. Word and phrase frequency can be configured to ignore
- *     common words ("a", "the", "an", etc.)
- * </p>
  *
  * @author <a href="https://github.com/scorbo2">scorbo2</a>
  * @since Snotes 2.0
@@ -117,7 +112,8 @@ public class StatisticsExtension extends SnotesExtension {
 
     /**
      * We will supply one action group for the main action panel.
-     * At a minimum, we will expose our StatisticsDialog (once we have one).
+     * This exposes actions for launching the StatisticsDialog,
+     * and for refreshing the cached statistics data.
      */
     @Override
     public List<ActionGroup> getActionGroups() {
@@ -147,7 +143,7 @@ public class StatisticsExtension extends SnotesExtension {
     }
 
     /**
-     * Listeners to our loader thread, and will show the StatisticsDialog when loading is complete.
+     * Listens to our loader thread, and shows the StatisticsDialog when loading is complete.
      * Our progress dialog will be visible while the loader is running, and the user will have
      * a "cancel" button they can use if the loader runs too long. If we detect a cancel event,
      * we simply do nothing here. User can try again later.
