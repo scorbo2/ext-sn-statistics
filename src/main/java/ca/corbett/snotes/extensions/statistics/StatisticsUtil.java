@@ -3,6 +3,7 @@ package ca.corbett.snotes.extensions.statistics;
 import ca.corbett.snotes.model.Note;
 import ca.corbett.snotes.model.Query;
 
+import java.time.DayOfWeek;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -15,6 +16,24 @@ import java.util.Map;
  * @since Snotes 2.0
  */
 public class StatisticsUtil {
+
+    public static final int MIN_PHRASE_LENGTH = 2; // a phrase must be at least 2 words long to be interesting
+    public static final int MAX_PHRASE_LENGTH = 10; // very rare we'd get more than 10 words in a common phrase
+
+    /**
+     * ISO-8601 defines Monday as the first day of the week (1) and Sunday as the last day of the week (7).
+     * But that's stupid. Weeks start with Sunday, and end with Saturday (at least here in North America).
+     * So, let's map from Java's implementation to our own:
+     */
+    public static final DayOfWeek[] DAYS_OF_WEEK = new DayOfWeek[]{
+            DayOfWeek.SUNDAY,
+            DayOfWeek.MONDAY,
+            DayOfWeek.TUESDAY,
+            DayOfWeek.WEDNESDAY,
+            DayOfWeek.THURSDAY,
+            DayOfWeek.FRIDAY,
+            DayOfWeek.SATURDAY
+    };
 
     private StatisticsUtil() {
     }
@@ -91,40 +110,26 @@ public class StatisticsUtil {
     }
 
     /**
-     * Given a list of notes, finds the most common phrases across all of them and
-     * returns the top N as a list of Phrase objects. Longer phrases are prioritized
-     * over shorter phrases, given the same occurrence count. Note that the returned
-     * phrases will be listed in descending order of occurrence count, and they will
-     * be stripped of punctuation and normalized to lowercase
-     * (so "Hello world!" and "hello, world" would both count towards the same phrase: "hello world").
-     * <p>
-     * <b>Note:</b> In rare cases, the normalization described above might
-     * cause false positives. For example, the phrase "this is not fun" may
-     * appear legitimately several times in the given notes, but it may also appear accidentally
-     * across two sentences: "A work of art, this is not. Fun though it may be, it is not art".
-     * When that example sentence is normalized, it appears to contain the phrase
-     * "this is not fun", even though it doesn't actually appear as a contiguous phrase in the original text.
-     * This is probably rare in practice, but just keep in mind that the results
-     * returned here may not be 100% accurate.
-     * </p>
+     * Given a list of notes, finds all phrases of length 2 to MAX_PHRASE_LENGTH that appear
+     * in the text of those notes, and counts how many times each phrase appears.
      * <p>
      * If you wish to only consider a filtered subset of the given list, then use
-     * findTopNPhrases(List&lt;Note&gt;, int, Query) instead and pass in your desired query.
+     * findPhrases(List&lt;Note&gt;, int, Query) instead and pass in your desired query.
      * </p>
      */
-    public static List<Phrase> findTopNPhrases(List<Note> notes, int n) {
-        return findTopNPhrases(notes, n, null);
+    public static PhraseList findPhrases(List<Note> notes) {
+        return findPhrases(notes, null);
     }
 
     /**
-     * Similar to findTopNPhrases(List&lt;Note&gt;, int), but allows you to
+     * Similar to findPhrases(List&lt;Note&gt;, int), but allows you to
      * specify a Query to filter the given list of notes before counting phrases.
-     * If the given Query is null, this is equivalent to findTopNPhrases(List&lt;Note&gt;, int).
+     * If the given Query is null, this is equivalent to findPhrases(List&lt;Note&gt;, int).
      */
-    public static List<Phrase> findTopNPhrases(List<Note> notes, int n, Query query) {
+    public static PhraseList findPhrases(List<Note> notes, Query query) {
         // You give me nothing, you get nothing:
-        if (notes == null || notes.isEmpty() || n <= 0) {
-            return List.of();
+        if (notes == null || notes.isEmpty()) {
+            return new PhraseList(null); // default to empty list if null
         }
 
         // If a query is provided, filter the notes first:
@@ -134,10 +139,9 @@ public class StatisticsUtil {
 
         // If our query filtered out everything, I guess we're done here:
         if (notes.isEmpty()) {
-            return List.of();
+            return new PhraseList(null);
         }
 
-        final int MAX_PHRASE_LENGTH = 10; // very rare we'd get more than 10 words in a common phrase
         Map<String, Integer> phraseCounts = new HashMap<>();
         for (Note note : notes) {
 
@@ -168,20 +172,27 @@ public class StatisticsUtil {
             }
         }
 
-        // Filter to only those with count > 1 and convert to an ordered list to get the top N (descending):
-        return phraseCounts.entrySet().stream()
-                           .filter(entry -> entry.getValue() > 1)
-                           .map(entry -> new Phrase(entry.getKey(), entry.getValue()))
-                           .sorted((p1, p2) -> {
-                               // Sort by count, descending:
-                               int cmp = Integer.compare(p2.occurrenceCount(), p1.occurrenceCount());
-                               if (cmp != 0) { return cmp; }
+        // Convert to PhraseList and return:
+        return new PhraseList(phraseCounts
+                                      .entrySet()
+                                      .stream()
+                                      .map(entry -> new Phrase(entry.getKey(),
+                                                               countWords(entry.getKey()),
+                                                               entry.getValue()))
+                                      .toList());
+    }
 
-                               // In the event of a tie, take the longer phrase first (since it's more specific):
-                               return Integer.compare(countWords(p2.phrase()),
-                                                      countWords(p1.phrase()));
-                           })
-                           .limit(n)
-                           .toList();
+    /**
+     * We have to guard against very small values being incorrectly rounded down to 0,
+     * because our ValueCell treats 0 as a special case meaning "no data". So, we'll
+     * put a very small floor in place if the given value is non-zero but would
+     * otherwise be normalized to a value very close to 0.
+     */
+    public static float normalizeValue(int value, int minValue, int maxValue) {
+        float normalized = (float)(value - minValue) / (maxValue - minValue);
+        if (value > 0 && normalized < 0.05f) {
+            return 0.05f; // enforce a minimum color intensity for non-zero values
+        }
+        return normalized;
     }
 }

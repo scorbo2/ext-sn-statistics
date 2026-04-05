@@ -1,9 +1,8 @@
 package ca.corbett.snotes.extensions.statistics.charts;
 
+import ca.corbett.snotes.extensions.statistics.Statistics;
 import ca.corbett.snotes.extensions.statistics.StatisticsExtension;
 import ca.corbett.snotes.extensions.statistics.StatisticsUtil;
-import ca.corbett.snotes.io.DataManager;
-import ca.corbett.snotes.model.Note;
 import ca.corbett.snotes.model.Query;
 import ca.corbett.snotes.model.QueryFactory;
 
@@ -15,6 +14,7 @@ import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -39,24 +39,25 @@ public class AllYearsChart extends JPanel {
     public static final int MIN_YEARS = 4;
 
     /**
-     * Creates a new AllYearsChart using the notes contained by the given DataManager.
+     * Creates a new AllYearsChart using the notes contained by the given Statistics instance.
      */
-    public AllYearsChart(DataManager dataManager) {
+    public AllYearsChart(Statistics stats) {
         // Handle the case where we were given nothing at all to work with:
-        if (dataManager == null ||
-                dataManager.getNotes().isEmpty() ||
-                dataManager.getUniqueYears().isEmpty()) {
+        if (stats == null ||
+                stats.getTotalNoteCount() == 0 ||
+                stats.getTotalWordCount() == 0 ||
+                stats.getUniqueYears().isEmpty()) {
             buildEmptyLayout();
             return;
         }
 
         // For all other cases, build the appropriate layout based on how many years we have to work with:
-        List<Integer> uniqueYears = dataManager.getUniqueYears();
+        List<Integer> uniqueYears = stats.getUniqueYears();
         if (uniqueYears.size() < MIN_YEARS) {
-            buildLabelLayout(dataManager, uniqueYears);
+            buildLabelLayout(stats);
         }
         else {
-            buildHeatmapLayout(dataManager, uniqueYears);
+            buildHeatmapLayout(stats);
         }
     }
 
@@ -73,25 +74,24 @@ public class AllYearsChart extends JPanel {
      * If we were given less than MIN_YEARS distinct years to work with,
      * build out a simple label-based layout that just lists the years we have.
      */
-    private void buildLabelLayout(DataManager dataManager, List<Integer> uniqueYears) {
+    private void buildLabelLayout(Statistics stats) {
         setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbc.anchor = GridBagConstraints.WEST;
-        gbc.insets = new Insets(4, 4, 4, 4);
-        for (int year : uniqueYears) {
+        gbc.insets = new Insets(4, 20, 4, 4);
+        for (int year : stats.getUniqueYears()) {
             Query yearQuery = QueryFactory.year(year);
-            List<Note> notes = yearQuery.execute(dataManager.getNotes());
-            String noteCount = String.format("%,d", notes.size());
-            String wordCount = String.format("%,d", StatisticsUtil.countWords(notes));
+            String noteCount = String.format("%,d", stats.getTotalNoteCount());
+            String wordCount = String.format("%,d", stats.getTotalWordCount());
             String label = String.format("<html><b>%d:</b> %s notes (%s words)</html>", year, noteCount, wordCount);
             add(new JLabel(label), gbc);
             gbc.gridy++;
         }
         gbc.gridx = 1;
         gbc.gridy = 0;
-        gbc.gridheight = uniqueYears.size();
+        gbc.gridheight = stats.getUniqueYears().size();
         gbc.weightx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         add(new JLabel(), gbc); // spacer to push labels to the left
@@ -101,44 +101,31 @@ public class AllYearsChart extends JPanel {
      * If we were given at least MIN_YEARS distinct years to work with,
      * build out a heatmap layout with a cell for each year.
      */
-    private void buildHeatmapLayout(DataManager dataManager, List<Integer> uniqueYears) {
-        // This is a lot of Query executions on potentially a lot of data.
-        // Should perhaps be done in a background thread...
-        // But DataManager operates entirely via an in-memory cache, so maybe it's not that bad?
+    private void buildHeatmapLayout(Statistics stats) {
+        final int minWordCount = findMinWordCount(stats);
+        final int maxWordCount = findMaxWordCount(stats);
+        final Color coldColor = StatisticsExtension.getColdColor();
+        final Color hotColor = StatisticsExtension.getHotColor();
 
-        // Compute all our ValueCells first so we can determine the max value for normalization:
-        List<ValueCell> cells = uniqueYears.stream()
-                                           .map(year -> {
-                                               Query yearQuery = QueryFactory.year(year);
-                                               List<Note> notes = yearQuery.execute(dataManager.getNotes());
-                                               int wordCount = StatisticsUtil.countWords(notes);
-                                               String tooltip = String.format(
-                                                       "<html><b>%d</b>: %,d notes (%,d words)</html>",
-                                                       year, notes.size(), wordCount);
-                                               return new ValueCell(tooltip, StatisticsExtension.getColdColor(),
-                                                                    wordCount);
-                                           })
-                                           .toList();
+        // Now we can create and color a ValueCell for each year:
+        List<ValueCell> valueCells = new ArrayList<>();
+        for (int year : stats.getUniqueYears()) {
+            int wordCountForYear = stats.getWordCountByYear().getOrDefault(year, 0);
+            String noteCount = String.format("%,d", stats.getNoteCountByYear().getOrDefault(year, 0));
+            String wordCount = String.format("%,d", wordCountForYear);
+            String tooltip = String.format("<html><b>%d:</b> %s notes (%s words)</html>", year, noteCount, wordCount);
+            ValueCell cell = new ValueCell(tooltip, coldColor, wordCountForYear);
+            float normalized = StatisticsUtil.normalizeValue(wordCountForYear, minWordCount, maxWordCount);
+            cell.setValueColor(normalized, coldColor, hotColor);
+            valueCells.add(cell);
+        }
 
-        final int minWordCount = cells.stream()
-                                      .map(ValueCell::getValue)
-                                      .min(Integer::compareTo)
-                                      .orElse(0);
-        final int maxWordCount = cells.stream()
-                                      .map(ValueCell::getValue)
-                                      .max(Integer::compareTo)
-                                      .orElse(1); // avoid divide-by-zero if all values are zero
-
-        // Now render each one, and compute its color in our range based on the value:
-        Color coldColor = StatisticsExtension.getColdColor();
-        Color hotColor = StatisticsExtension.getHotColor();
+        // Now render each one:
         setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.gridy = 0;
         gbc.insets = new Insets(0, 0, 0, 0);
-        for (ValueCell cell : cells) {
-            float valueF = (float)(cell.getValue() - minWordCount) / (maxWordCount - minWordCount); // normalize to 0-1
-            cell.setValueColor(valueF, coldColor, hotColor);
+        for (ValueCell cell : valueCells) {
             add(cell, gbc);
             gbc.gridx++;
         }
@@ -146,6 +133,22 @@ public class AllYearsChart extends JPanel {
         // This could be very wide indeed for large datasets.
         // It's up to the caller to stick us into a JScrollPane.
         // Let's try to figure out our preferred size so that the scroll pane's scroll bars will work correctly:
-        setPreferredSize(new Dimension(ValueCell.CELL_SIZE * cells.size(), ValueCell.CELL_SIZE));
+        int cellSize = valueCells.get(0).getCellSize();
+        setPreferredSize(new Dimension(cellSize * valueCells.size(), cellSize));
+    }
+
+    private int findMinWordCount(Statistics stats) {
+        return stats.getUniqueYears().stream()
+                    .map(year -> stats.getWordCountByYear().getOrDefault(year, 0))
+                    .min(Integer::compareTo)
+                    .orElse(0);
+    }
+
+    private int findMaxWordCount(Statistics stats) {
+        int max = stats.getUniqueYears().stream()
+                       .map(year -> stats.getWordCountByYear().getOrDefault(year, 0))
+                       .max(Integer::compareTo)
+                       .orElse(1); // avoid divide-by-zero if all values are zero
+        return max == 0 ? 1 : max; // ensure max is at least 1 to avoid divide-by-zero
     }
 }

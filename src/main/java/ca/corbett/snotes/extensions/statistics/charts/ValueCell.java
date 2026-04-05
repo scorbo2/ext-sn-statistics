@@ -1,5 +1,7 @@
 package ca.corbett.snotes.extensions.statistics.charts;
 
+import ca.corbett.extras.LookAndFeelManager;
+
 import javax.swing.BorderFactory;
 import javax.swing.JPanel;
 import java.awt.Color;
@@ -20,6 +22,11 @@ import java.awt.Dimension;
  * Technically, this could all be done by the caller right now, since we extend JPanel,
  * but we could add facilities here to make that much easier.
  * </p>
+ * <p>
+ *     Note: for this domain, zero is considered a "special" value, meaning "no data".
+ *     So, if our value is zero, we ignore the color scale, and instead show
+ *     the default panel background color.
+ * </p>
  *
  * @author <a href="https://github.com/scorbo2">scorbo2</a>
  * @since Snotes 2.0
@@ -27,10 +34,9 @@ import java.awt.Dimension;
 public class ValueCell extends JPanel {
 
     /**
-     * Value cells have a fixed square size.
-     * This is not currently configurable.
+     * Default square dimensions for each cell. Caller can override if wanted.
      */
-    public static final int CELL_SIZE = 24;
+    private static final int CELL_SIZE = 24;
 
     /**
      * The specific numeric value that we represent.
@@ -39,10 +45,16 @@ public class ValueCell extends JPanel {
      */
     private final int value;
 
+    private final int cellSize;
+
+    public ValueCell(String tooltip, Color color, int value) {
+        this(tooltip, color, value, CELL_SIZE);
+    }
+
     /**
      * Creates a ValueCell with the given tooltip and background color.
      */
-    public ValueCell(String tooltip, Color color, int value) {
+    public ValueCell(String tooltip, Color color, int value, int cellSize) {
         setToolTipText(tooltip);
         setBackground(color);
         setBorder(BorderFactory.createLoweredBevelBorder());
@@ -51,9 +63,10 @@ public class ValueCell extends JPanel {
         // Presumably, we will be dropped into a GridBagLayout,
         // which only cares about preferred size, but let's
         // not make any assumptions.
-        setPreferredSize(new Dimension(CELL_SIZE, CELL_SIZE));
-        setMinimumSize(new Dimension(CELL_SIZE, CELL_SIZE));
-        setMaximumSize(new Dimension(CELL_SIZE, CELL_SIZE));
+        this.cellSize = cellSize;
+        setPreferredSize(new Dimension(cellSize, cellSize));
+        setMinimumSize(new Dimension(cellSize, cellSize));
+        setMaximumSize(new Dimension(cellSize, cellSize));
     }
 
     /**
@@ -62,6 +75,13 @@ public class ValueCell extends JPanel {
      */
     public int getValue() {
         return value;
+    }
+
+    /**
+     * Returns the effective cell size of this ValueCell.
+     */
+    public int getCellSize() {
+        return cellSize;
     }
 
     /**
@@ -74,6 +94,11 @@ public class ValueCell extends JPanel {
      * </p>
      */
     public void setValueColor(float f, Color coldColor, Color hotColor) {
+        if (f <= 0.0001f) { // don't do == 0 because of potential floating point weirdness
+            // Zero is a special value that means "no data":
+            setBackground(LookAndFeelManager.getLafColor("Panel.background", Color.LIGHT_GRAY));
+            return;
+        }
         setBackground(blendColors(f, coldColor, hotColor));
     }
 
