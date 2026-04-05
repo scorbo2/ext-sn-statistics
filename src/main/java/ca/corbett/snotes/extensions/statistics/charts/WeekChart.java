@@ -52,7 +52,7 @@ public class WeekChart extends JPanel {
         final Color coldColor = StatisticsExtension.getColdColor();
         final Color hotColor = StatisticsExtension.getHotColor();
 
-        // Now we can create and color a ValueCell for each year:
+        // Now we can create and color a ValueCell for each day of the week:
         List<ValueCell> valueCells = new ArrayList<>();
         for (int dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
             int wordCount = stats.getWordCountByDayOfWeek().getOrDefault(dayOfWeek, 0);
