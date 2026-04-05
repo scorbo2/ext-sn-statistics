@@ -114,7 +114,7 @@ public class StatisticsUtil {
      * in the text of those notes, and counts how many times each phrase appears.
      * <p>
      * If you wish to only consider a filtered subset of the given list, then use
-     * findPhrases(List&lt;Note&gt;, int, Query) instead and pass in your desired query.
+     * findPhrases(List&lt;Note&gt;, Query) instead and pass in your desired query.
      * </p>
      */
     public static PhraseList findPhrases(List<Note> notes) {
@@ -122,9 +122,9 @@ public class StatisticsUtil {
     }
 
     /**
-     * Similar to findPhrases(List&lt;Note&gt;, int), but allows you to
+     * Similar to findPhrases(List&lt;Note&gt;), but allows you to
      * specify a Query to filter the given list of notes before counting phrases.
-     * If the given Query is null, this is equivalent to findPhrases(List&lt;Note&gt;, int).
+     * If the given Query is null, this is equivalent to findPhrases(List&lt;Note&gt;).
      */
     public static PhraseList findPhrases(List<Note> notes, Query query) {
         // You give me nothing, you get nothing:
