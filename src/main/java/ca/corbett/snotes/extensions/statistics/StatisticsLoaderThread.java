@@ -1,5 +1,6 @@
 package ca.corbett.snotes.extensions.statistics;
 
+import ca.corbett.extras.logging.Stopwatch;
 import ca.corbett.extras.progress.SimpleProgressWorker;
 import ca.corbett.snotes.io.DataManager;
 import ca.corbett.snotes.model.Note;
@@ -32,6 +33,8 @@ import java.util.stream.Collectors;
  * @since Snotes 2.0
  */
 public class StatisticsLoaderThread extends SimpleProgressWorker {
+
+    private static final Logger log = Logger.getLogger(StatisticsLoaderThread.class.getName());
 
     private static final String MSG = "This may take some time!";
     private final DataManager dataManager;
@@ -111,7 +114,7 @@ public class StatisticsLoaderThread extends SimpleProgressWorker {
             }
         }
         catch (Exception e) {
-            Logger.getLogger(getClass().getName()).log(Level.SEVERE, "Statistics worker failed", e);
+            log.log(Level.SEVERE, "Statistics worker failed", e);
 
             // If any worker threw an exception, we'll end up here. In that case, we'll just cancel the whole operation.
             wasCanceled = true;
@@ -232,10 +235,15 @@ public class StatisticsLoaderThread extends SimpleProgressWorker {
      * this extra work.
      */
     void loadPhrases() {
+        Stopwatch.start("loadPhrases");
         List<Note> allNotes = dataManager.getNotes();
         allPhrases = StatisticsUtil.findPhrases(allNotes, null);
         phrasesByLength = new HashMap<>();
         chunkComplete();
+        Stopwatch.stop("loadPhrases");
+        log.info("StatisticsLoaderThread: loadPhrases: took "
+                         + Stopwatch.reportFormatted("loadPhrases")
+                         + " to load all phrases");
         for (int length = StatisticsUtil.MIN_PHRASE_LENGTH; length <= StatisticsUtil.MAX_PHRASE_LENGTH; length++) {
             if (wasCanceled) {
                 return; // no point in continuing
