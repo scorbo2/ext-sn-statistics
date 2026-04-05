@@ -86,7 +86,7 @@ public class ValueCell extends JPanel {
 
     /**
      * Sets our background color based on the given value f, which is in the range [0,1],
-     * and the given cold and hot colors. We will interpolate a Color in between th
+     * and the given cold and hot colors. We will interpolate a Color in between the
      * given cold and hot colors based on f, and set that as our background color.
      * For example, a value of 0.5 with colors BLACK,WHITE would set our background to a medium gray.
      * <p>
