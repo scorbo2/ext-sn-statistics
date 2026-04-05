@@ -17,6 +17,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 /**
@@ -109,6 +111,8 @@ public class StatisticsLoaderThread extends SimpleProgressWorker {
             }
         }
         catch (Exception e) {
+            Logger.getLogger(getClass().getName()).log(Level.SEVERE, "Statistics worker failed", e);
+
             // If any worker threw an exception, we'll end up here. In that case, we'll just cancel the whole operation.
             wasCanceled = true;
             fireProgressCanceled();
@@ -233,6 +237,9 @@ public class StatisticsLoaderThread extends SimpleProgressWorker {
         phrasesByLength = new HashMap<>();
         chunkComplete();
         for (int length = StatisticsUtil.MIN_PHRASE_LENGTH; length <= StatisticsUtil.MAX_PHRASE_LENGTH; length++) {
+            if (wasCanceled) {
+                return; // no point in continuing
+            }
             phrasesByLength.put(length, allPhrases.filter(10, length));
             chunkComplete();
         }
