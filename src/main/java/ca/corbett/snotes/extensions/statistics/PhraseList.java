@@ -55,9 +55,16 @@ public class PhraseList {
      * @return A list of up to n Phrases that match the specified filters, in descending order by occurrence count.
      */
     public List<Phrase> filter(int n, int minPhraseLength) {
+        if (n <= 0) {
+            return List.of();
+        }
+
+        // Clamp the requested phrase length to our defined bounds:
+        final int minLength = Math.min(Math.max(minPhraseLength, StatisticsUtil.MIN_PHRASE_LENGTH),
+                                       StatisticsUtil.MAX_PHRASE_LENGTH);
         return phrases.stream()
                            .filter(entry -> entry.occurrenceCount() > 1)
-                           .filter(entry -> entry.wordCount() >= minPhraseLength)
+                      .filter(entry -> entry.wordCount() >= minLength)
                            .sorted((p1, p2) -> {
                                // Sort by count, descending:
                                int cmp = Integer.compare(p2.occurrenceCount(), p1.occurrenceCount());
