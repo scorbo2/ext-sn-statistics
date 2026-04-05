@@ -1,9 +1,14 @@
 package ca.corbett.snotes.extensions.statistics;
 
 import ca.corbett.extensions.AppExtensionInfo;
+import ca.corbett.extras.gradient.ColorSelectionType;
 import ca.corbett.extras.properties.AbstractProperty;
+import ca.corbett.extras.properties.ColorProperty;
+import ca.corbett.snotes.AppConfig;
 import ca.corbett.snotes.extensions.SnotesExtension;
 
+import java.awt.Color;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -27,6 +32,11 @@ public class StatisticsExtension extends SnotesExtension {
 
     private static final String extInfoLocation = "/ca/corbett/snotes/extensions/statistics/extInfo.json";
     private final AppExtensionInfo extInfo;
+
+    private static final String COLD_PROP = "Statistics.Options.coldColor";
+    private static final String HOT_PROP = "Statistics.Options.hotColor";
+    private static final Color DEFAULT_COLD = new Color(48, 48, 212);
+    private static final Color DEFAULT_HOT = new Color(212, 48, 96);
 
     /**
      * We must supply a no-arg constructor to be invoked by ExtensionManager.
@@ -56,8 +66,36 @@ public class StatisticsExtension extends SnotesExtension {
      */
     @Override
     protected List<AbstractProperty> createConfigProperties() {
-        // Currently none
-        return List.of();
+        List<AbstractProperty> props = new ArrayList<>();
+        props.add(new ColorProperty(COLD_PROP, "Cold color", ColorSelectionType.SOLID)
+                          .setSolidColor(DEFAULT_COLD)
+                          .setHelpText("Represents the 'cold' end of the data spectrum (lower values)."));
+        props.add(new ColorProperty(HOT_PROP, "Hot color", ColorSelectionType.SOLID)
+                          .setSolidColor(DEFAULT_HOT)
+                          .setHelpText("Represents the 'hot' end of the data spectrum (higher values)."));
+        return props;
+    }
+
+    /**
+     * Returns our currently-configured "cold" color, which is used to represent the lower end of the data spectrum.
+     */
+    public static Color getColdColor() {
+        AbstractProperty prop = AppConfig.getInstance().getPropertiesManager().getProperty(COLD_PROP);
+        if (prop instanceof ColorProperty colorProp) {
+            return colorProp.getSolidColor();
+        }
+        return DEFAULT_COLD;
+    }
+
+    /**
+     * Returns our currently-configured "hot" color, which is used to represent the higher end of the data spectrum.
+     */
+    public static Color getHotColor() {
+        AbstractProperty prop = AppConfig.getInstance().getPropertiesManager().getProperty(HOT_PROP);
+        if (prop instanceof ColorProperty colorProp) {
+            return colorProp.getSolidColor();
+        }
+        return DEFAULT_HOT;
     }
 
     /**

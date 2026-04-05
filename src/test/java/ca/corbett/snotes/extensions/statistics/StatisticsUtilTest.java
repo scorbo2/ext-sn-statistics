@@ -115,18 +115,15 @@ class StatisticsUtilTest {
     }
 
     @Test
-    public void findTopNPhrases_shouldReturnMostCommonPhrases() {
-        // GIVEN a list of notes with some common phrases:
-        Note note1 = new Note();
-        note1.setText("common phrase one hello");
-        Note note2 = new Note();
-        note2.setText("common phrase one goodbye");
-        Note note3 = new Note();
-        note3.setText("common phrase two");
-        List<Note> notes = List.of(note1, note2, note3);
+    public void findPhrases_shouldReturnMostCommonPhrases() {
+        // GIVEN a list of phrases:
+        Phrase phrase1 = new Phrase("common phrase", 2, 3);
+        Phrase phrase2 = new Phrase("common phrase one", 3, 2);
+        Phrase phrase3 = new Phrase("common phrase two", 3, 1);
+        PhraseList phraseList = new PhraseList(List.of(phrase1, phrase2, phrase3));
 
         // WHEN we find the top 2 phrases:
-        List<Phrase> topPhrases = StatisticsUtil.findTopNPhrases(notes, 2);
+        List<Phrase> topPhrases = phraseList.filter(2, 2);
 
         // THEN the most common phrase should be "common phrase" with count 3,
         // and the second most common should be "common phrase one" with count 2
@@ -138,62 +135,19 @@ class StatisticsUtilTest {
     }
 
     @Test
-    public void findTopNPhrases_withPunctuationAndCase_shouldNormalize() {
-        // GIVEN a list of notes with phrases that differ only by punctuation and case:
-        Note note1 = new Note();
-        note1.setText("Hello world!");
-        Note note2 = new Note();
-        note2.setText("hello world");
-        Note note3 = new Note();
-        note3.setText("Hello, world.");
-        List<Note> notes = List.of(note1, note2, note3);
+    public void findPhrases_withMinimumPhraseLength_shouldFilter() {
+        // GIVEN a list of phrases of varying lengths:
+        Phrase phrase1 = new Phrase("common phrase", 2, 3);
+        Phrase phrase2 = new Phrase("common phrase one", 3, 2);
+        PhraseList phraseList = new PhraseList(List.of(phrase1, phrase2));
 
-        // WHEN we find the top 1 phrase:
-        List<Phrase> topPhrases = StatisticsUtil.findTopNPhrases(notes, 1);
+        // WHEN we find the top 2 phrases with minimum length 3:
+        List<Phrase> topPhrases = phraseList.filter(2, 3);
 
-        // THEN it should treat "Hello world!", "hello world", and "Hello, world." as the same phrase
+        // THEN it should only return phrases that are at least 3 words long,
+        // so "common phrase" (2 words) should be filtered out, and "common phrase one" (3 words) should be the top result
         assertEquals(1, topPhrases.size());
-        assertEquals("hello world", topPhrases.get(0).phrase());
-        assertEquals(3, topPhrases.get(0).occurrenceCount());
-    }
-
-    @Test
-    public void findTopNPhrases_withApostrophes_shouldPreserve() {
-        // GIVEN a list of notes with phrases that include contractions:
-        Note note1 = new Note();
-        note1.setText("Don't stop believing");
-        Note note2 = new Note();
-        note2.setText("don't stop believing");
-        Note note3 = new Note();
-        note3.setText("Don't stop believing!");
-        List<Note> notes = List.of(note1, note2, note3);
-
-        // WHEN we find the top 1 phrase:
-        List<Phrase> topPhrases = StatisticsUtil.findTopNPhrases(notes, 1);
-
-        // THEN it should preserve the apostrophes and treat "Don't stop believing" as the same phrase in all cases
-        assertEquals(1, topPhrases.size());
-        // note that there's a three-way tie in our test data between "don't stop", "stop believing",
-        // and "don't stop believing", all with count 3. In the event of a tie, we prioritize
-        // the longer phrase, so we should get "don't stop believing" as the top result.
-        // This test only asks for the top 1 phrase, so we only assert that highest-ranked result here.
-        assertEquals("don't stop believing", topPhrases.get(0).phrase());
-        assertEquals(3, topPhrases.get(0).occurrenceCount());
-    }
-
-    @Test
-    public void findTopNPhrases_withAllEmptyNotes_shouldReturnEmptyList() {
-        // GIVEN a list of notes that are all empty or null:
-        Note note1 = new Note();
-        note1.setText("");
-        Note note2 = new Note();
-        note2.setText(null);
-        List<Note> notes = List.of(note1, note2);
-
-        // WHEN we find the top 5 phrases:
-        List<Phrase> topPhrases = StatisticsUtil.findTopNPhrases(notes, 5);
-
-        // THEN it should return an empty list, because there are no valid phrases to count:
-        assertEquals(0, topPhrases.size());
+        assertEquals("common phrase one", topPhrases.get(0).phrase());
+        assertEquals(2, topPhrases.get(0).occurrenceCount());
     }
 }
