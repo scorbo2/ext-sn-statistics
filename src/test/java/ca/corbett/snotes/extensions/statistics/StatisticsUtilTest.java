@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StatisticsUtilTest {
 
@@ -115,39 +117,115 @@ class StatisticsUtilTest {
     }
 
     @Test
-    public void findPhrases_shouldReturnMostCommonPhrases() {
-        // GIVEN a list of phrases:
-        Phrase phrase1 = new Phrase("common phrase", 2, 3);
-        Phrase phrase2 = new Phrase("common phrase one", 3, 2);
-        Phrase phrase3 = new Phrase("common phrase two", 3, 1);
-        PhraseList phraseList = new PhraseList(List.of(phrase1, phrase2, phrase3));
+    public void findPhrases_withNullNotes_shouldReturnEmptyPhraseList() {
+        // GIVEN a null note list:
+        // WHEN we call findPhrases:
+        PhraseList result = StatisticsUtil.findPhrases(null);
 
-        // WHEN we find the top 2 phrases:
-        List<Phrase> topPhrases = phraseList.filter(2, 2);
-
-        // THEN the most common phrase should be "common phrase" with count 3,
-        // and the second most common should be "common phrase one" with count 2
-        assertEquals(2, topPhrases.size());
-        assertEquals("common phrase", topPhrases.get(0).phrase());
-        assertEquals(3, topPhrases.get(0).occurrenceCount());
-        assertEquals("common phrase one", topPhrases.get(1).phrase());
-        assertEquals(2, topPhrases.get(1).occurrenceCount());
+        // THEN we should get an empty phrase list:
+        assertTrue(result.getPhrases().isEmpty());
     }
 
     @Test
-    public void findPhrases_withMinimumPhraseLength_shouldFilter() {
-        // GIVEN a list of phrases of varying lengths:
-        Phrase phrase1 = new Phrase("common phrase", 2, 3);
-        Phrase phrase2 = new Phrase("common phrase one", 3, 2);
-        PhraseList phraseList = new PhraseList(List.of(phrase1, phrase2));
+    public void findPhrases_withEmptyNotes_shouldReturnEmptyPhraseList() {
+        // GIVEN an empty note list:
+        List<Note> notes = List.of();
 
-        // WHEN we find the top 2 phrases with minimum length 3:
-        List<Phrase> topPhrases = phraseList.filter(2, 3);
+        // WHEN we call findPhrases:
+        PhraseList result = StatisticsUtil.findPhrases(notes);
 
-        // THEN it should only return phrases that are at least 3 words long,
-        // so "common phrase" (2 words) should be filtered out, and "common phrase one" (3 words) should be the top result
-        assertEquals(1, topPhrases.size());
-        assertEquals("common phrase one", topPhrases.get(0).phrase());
-        assertEquals(2, topPhrases.get(0).occurrenceCount());
+        // THEN we should get an empty phrase list:
+        assertTrue(result.getPhrases().isEmpty());
+    }
+
+    @Test
+    public void findPhrases_withQueryThatFiltersAllNotes_shouldReturnEmptyPhraseList() {
+        // GIVEN a note from 1999 and a query that only matches notes from 2000:
+        Note note = new Note();
+        note.setText("hello world hello world");
+        note.setDate(new YMDDate("1999-01-01"));
+        Query query = new Query();
+        query.addFilter(new YearFilter(2000, DateFilterType.ON));
+
+        // WHEN we call findPhrases with this filter query:
+        PhraseList result = StatisticsUtil.findPhrases(List.of(note), query);
+
+        // THEN the result should be empty because the query filters out all notes:
+        assertTrue(result.getPhrases().isEmpty());
+    }
+
+    @Test
+    public void findPhrases_withNotesThatNormalizeToWhitespace_shouldBeIgnored() {
+        // GIVEN a note whose text consists entirely of punctuation (normalizes to whitespace):
+        Note punctuationNote = new Note();
+        punctuationNote.setText("!!! ??? ...");
+
+        // AND a note with real recurring text:
+        Note realNote = new Note();
+        realNote.setText("hello world hello world");
+
+        // WHEN we call findPhrases on both notes:
+        PhraseList result = StatisticsUtil.findPhrases(List.of(punctuationNote, realNote));
+
+        // THEN the punctuation-only note should be ignored, and phrases from the real note should be present:
+        List<Phrase> filtered = result.filter(10, 2);
+        assertFalse(filtered.isEmpty());
+        assertEquals("hello world", filtered.get(0).phrase());
+    }
+
+    @Test
+    public void findPhrases_shouldStripPunctuationAndNormalizeToLowercase() {
+        // GIVEN notes where the same phrase appears with different cases and punctuation:
+        Note note1 = new Note();
+        note1.setText("Hello, World! Hello, World!");
+        Note note2 = new Note();
+        note2.setText("hello world! hello world!");
+
+        // WHEN we call findPhrases:
+        PhraseList result = StatisticsUtil.findPhrases(List.of(note1, note2));
+
+        // THEN punctuation should be stripped and text normalized to lowercase,
+        // so all four occurrences count towards the same normalized phrase "hello world":
+        List<Phrase> filtered = result.filter(10, 2);
+        assertEquals(1, filtered.size());
+        assertEquals("hello world", filtered.get(0).phrase());
+        assertEquals(4, filtered.get(0).occurrenceCount());
+    }
+
+    @Test
+    public void findPhrases_shouldPruneSingleOccurrencePhrases() {
+        // GIVEN notes where every phrase appears exactly once (no overlapping words between notes):
+        Note note1 = new Note();
+        note1.setText("alpha beta gamma delta");
+        Note note2 = new Note();
+        note2.setText("echo foxtrot golf hotel");
+
+        // WHEN we call findPhrases:
+        PhraseList result = StatisticsUtil.findPhrases(List.of(note1, note2));
+
+        // THEN the result should be empty because all phrases occur only once:
+        assertTrue(result.getPhrases().isEmpty());
+    }
+
+    @Test
+    public void findPhrases_shouldReturnPhrasesInDecreasingOrderOfOccurrence() {
+        // GIVEN a note with a phrase that appears more often than others:
+        // "hello world" appears 3 times, while other 2-word phrases appear only twice
+        Note note = new Note();
+        note.setText("hello world today hello world today hello world");
+
+        // WHEN we call findPhrases:
+        PhraseList result = StatisticsUtil.findPhrases(List.of(note));
+
+        // THEN the phrases should be returned in decreasing order of occurrence count:
+        List<Phrase> filtered = result.filter(10, 2);
+        assertFalse(filtered.isEmpty());
+        for (int i = 0; i < filtered.size() - 1; i++) {
+            assertTrue(filtered.get(i).occurrenceCount() >= filtered.get(i + 1).occurrenceCount(),
+                       "Phrases should be in decreasing order of occurrence count");
+        }
+        // The most common 2-word phrase should be first:
+        assertEquals("hello world", filtered.get(0).phrase());
+        assertEquals(3, filtered.get(0).occurrenceCount());
     }
 }
