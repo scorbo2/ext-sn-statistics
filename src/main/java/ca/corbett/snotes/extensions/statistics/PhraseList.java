@@ -63,7 +63,7 @@ public class PhraseList {
         final int minLength = Math.min(Math.max(minPhraseLength, StatisticsUtil.MIN_PHRASE_LENGTH),
                                        StatisticsUtil.MAX_PHRASE_LENGTH);
         return phrases.stream()
-                           .filter(entry -> entry.occurrenceCount() > 1)
+                      .filter(entry -> entry.occurrenceCount() >= StatisticsUtil.MIN_PHRASE_FREQUENCY)
                       .filter(entry -> entry.wordCount() >= minLength)
                            .sorted((p1, p2) -> {
                                // Sort by count, descending:

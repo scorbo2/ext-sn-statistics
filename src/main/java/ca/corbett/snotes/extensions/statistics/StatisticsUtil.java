@@ -6,7 +6,6 @@ import ca.corbett.snotes.model.Query;
 import java.time.DayOfWeek;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -19,6 +18,7 @@ public class StatisticsUtil {
 
     public static final int MIN_PHRASE_LENGTH = 2; // a phrase must be at least 2 words long to be interesting
     public static final int MAX_PHRASE_LENGTH = 10; // very rare we'd get more than 10 words in a common phrase
+    public static final int MIN_PHRASE_FREQUENCY = 2; // single-occurrence phrases are not interesting and are very expensive to store
 
     /**
      * ISO-8601 defines Monday as the first day of the week (1) and Sunday as the last day of the week (7).
@@ -142,17 +142,33 @@ public class StatisticsUtil {
             return new PhraseList(null);
         }
 
-        Map<String, Integer> phraseCounts = new HashMap<>();
+        // int[] stores { wordCount, frequency } per phrase, so we don't have to re-parse
+        // the phrase string to count words at the end (we already know the count from `len`).
+        Map<String, int[]> phraseCounts = new HashMap<>();
         for (Note note : notes) {
 
+            // Cache getText() to avoid repeated virtual calls:
+            String noteText = note == null ? null : note.getText();
+
             // Skip null notes, and notes with no text:
-            if (note == null || note.getText() == null || note.getText().isBlank()) {
+            if (noteText == null || noteText.isBlank()) {
                 continue;
             }
 
-            // We don't care about case for this search, and we should strip out punctuation:
-            String text = note.getText().toLowerCase(Locale.ROOT);
-            text = text.replaceAll("[^\\w']", " ").trim(); // keep apostrophes! "don't", "isn't", etc.
+            // Single-pass normalization: lowercase + replace non-word chars with spaces.
+            // This replaces the two-pass approach (toLowerCase then replaceAll) with one
+            // character-level loop, avoiding a second full scan and regex overhead.
+            StringBuilder normalized = new StringBuilder(noteText.length());
+            for (int ci = 0; ci < noteText.length(); ci++) {
+                char c = noteText.charAt(ci);
+                if (Character.isLetterOrDigit(c) || c == '\'') {
+                    normalized.append(Character.toLowerCase(c));
+                }
+                else {
+                    normalized.append(' ');
+                }
+            }
+            String text = normalized.toString().trim();
 
             // If the normalization left us with nothing, then we have no phrases to count:
             if (text.isBlank()) {
@@ -166,19 +182,33 @@ public class StatisticsUtil {
             for (int i = 0; i < words.length; i++) {
                 StringBuilder phrase = new StringBuilder(words[i]);
                 for (int len = 2; len <= MAX_PHRASE_LENGTH && (i + len - 1) < words.length; len++) {
-                    phrase.append(" ").append(words[i + len - 1]);
-                    phraseCounts.merge(phrase.toString(), 1, Integer::sum);
+                    phrase.append(' ').append(words[i + len - 1]);
+                    String key = phrase.toString();
+                    // Explicit get/put avoids lambda allocation on every inner-loop iteration:
+                    int[] counts = phraseCounts.get(key);
+                    if (counts == null) {
+                        phraseCounts.put(key, new int[]{len, 1});
+                    }
+                    else {
+                        counts[1]++;
+                    }
                 }
             }
         }
 
-        // Convert to PhraseList and return:
+        // Prune all single-occurrence phrases before materializing into a list.
+        // In large datasets, they are the overwhelming majority
+        // of map entries, which may cause an OutOfMemoryException during .toList().
+        phraseCounts.values().removeIf(v -> v[1] < MIN_PHRASE_FREQUENCY);
+
+        // Convert to PhraseList and return.
+        // Word count comes directly from the stored int[0], not re-parsed from the string:
         return new PhraseList(phraseCounts
                                       .entrySet()
                                       .stream()
                                       .map(entry -> new Phrase(entry.getKey(),
-                                                               countWords(entry.getKey()),
-                                                               entry.getValue()))
+                                                               entry.getValue()[0],
+                                                               entry.getValue()[1]))
                                       .toList());
     }
 
