@@ -43,7 +43,7 @@ public class ValueCell extends JPanel {
      * We have no idea what this is! Could be a count of notes,
      * a count of words, or whatever. Doesn't matter here.
      */
-    private final int value;
+    private int value;
 
     private final int cellSize;
 
@@ -75,6 +75,17 @@ public class ValueCell extends JPanel {
      */
     public int getValue() {
         return value;
+    }
+
+    /**
+     * Updates the value contained in this cell. Note that this does
+     * not change our cell color! Callers must call setValueColor()
+     * separately if they want to update our color based on the new value.
+     * Remember that this value means nothing to us - we don't know
+     * what it means! This is just a UI class.
+     */
+    public void setValue(int newValue) {
+        this.value = newValue;
     }
 
     /**

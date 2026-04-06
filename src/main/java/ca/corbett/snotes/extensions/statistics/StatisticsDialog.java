@@ -8,6 +8,7 @@ import ca.corbett.forms.fields.LabelField;
 import ca.corbett.forms.fields.PanelField;
 import ca.corbett.snotes.Resources;
 import ca.corbett.snotes.extensions.statistics.charts.AllYearsChart;
+import ca.corbett.snotes.extensions.statistics.charts.MonthChart;
 import ca.corbett.snotes.extensions.statistics.charts.WeekChart;
 import ca.corbett.snotes.extensions.statistics.charts.YearChart;
 import ca.corbett.snotes.ui.MainWindow;
@@ -27,7 +28,9 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.time.DayOfWeek;
+import java.time.Month;
 import java.time.format.TextStyle;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -41,6 +44,9 @@ public class StatisticsDialog extends JDialog {
 
     private static final int DIALOG_WIDTH = 600;
     private final Statistics stats;
+    private ComboField<String> monthCombo;
+    private ComboField<String> yearCombo;
+    private MonthChart monthChart;
     private ComboField<Integer> phraseLengthCombo;
     private final LabelField[] phraseLabels = new LabelField[10];
 
@@ -63,6 +69,7 @@ public class StatisticsDialog extends JDialog {
         JTabbedPane tabPane = new JTabbedPane();
         tabPane.addTab("Overview", ScrollUtil.buildScrollPane(buildOverviewTab()));
         tabPane.addTab("Years", ScrollUtil.buildScrollPane(buildYearsTab()));
+        tabPane.addTab("Months", ScrollUtil.buildScrollPane(buildMonthsTab()));
         tabPane.addTab("Weeks", ScrollUtil.buildScrollPane(buildWeeksTab()));
         tabPane.addTab("Phrases", ScrollUtil.buildScrollPane(buildPhrasesTab()));
 
@@ -156,6 +163,70 @@ public class StatisticsDialog extends JDialog {
         }
 
         return formPanel;
+    }
+
+    /**
+     * Builds a MonthChart showing data for the days of the month.
+     */
+    private JComponent buildMonthsTab() {
+        FormPanel formPanel = new FormPanel(Alignment.TOP_LEFT);
+        formPanel.setBorderMargin(8);
+        formPanel.add(LabelField.createBoldHeaderLabel("Notes by month"));
+
+        Month mostActiveMonthByWords = stats.getMostActiveMonthByWords();
+        if (mostActiveMonthByWords != null) {
+            formPanel.add(new LabelField("You seem to write the most words in "
+                                                 + mostActiveMonthByWords.getDisplayName(TextStyle.FULL,
+                                                                                         Locale.getDefault())
+                                                 + ": "
+                                                 + String.format("%,d words", stats.getAllMonthsWordCount()
+                                                                                   .getOrDefault(
+                                                                                           mostActiveMonthByWords.getValue(),
+                                                                                           0)) + " total."));
+        }
+        Month mostActiveMonthByNotes = stats.getMostActiveMonthByNotes();
+        if (mostActiveMonthByNotes != null) {
+            formPanel.add(new LabelField("You seem to create the most notes in "
+                                                 + mostActiveMonthByNotes.getDisplayName(TextStyle.FULL,
+                                                                                         Locale.getDefault())
+                                                 + ": "
+                                                 + String.format("%,d notes", stats.getAllMonthsNoteCount()
+                                                                                   .getOrDefault(
+                                                                                           mostActiveMonthByNotes.getValue(),
+                                                                                           0)) + " total."));
+        }
+
+        List<String> months = new ArrayList<>(13);
+        months.add("All months");
+        for (int i = 1; i <= 12; i++) {
+            months.add(Month.of(i).getDisplayName(TextStyle.FULL, Locale.getDefault()));
+        }
+        monthCombo = new ComboField<>("Select month:", months, 0);
+        monthCombo.addValueChangedListener(field -> monthFilterChanged());
+        formPanel.add(monthCombo);
+
+        List<String> years = new ArrayList<>(stats.getUniqueYears().size() + 1);
+        years.add("All years");
+        stats.getUniqueYears().stream().sorted().forEach(year -> years.add(String.valueOf(year)));
+        yearCombo = new ComboField<>("Select year:", years, 0);
+        yearCombo.addValueChangedListener(field -> monthFilterChanged());
+        formPanel.add(yearCombo);
+
+        monthChart = new MonthChart(stats.getAllNotes(), stats.getUniqueYears());
+        PanelField panelField = new PanelField(new FlowLayout(FlowLayout.LEFT));
+        panelField.getPanel().add(monthChart);
+        formPanel.add(panelField);
+
+        return formPanel;
+    }
+
+    /**
+     * Invoked internally when the user changes either the month or year selection in the combo boxes on the Months tab.
+     */
+    private void monthFilterChanged() {
+        Integer yearFilter = yearCombo.getSelectedIndex() > 0 ? Integer.valueOf(yearCombo.getSelectedItem()) : null;
+        Integer monthFilter = monthCombo.getSelectedIndex() > 0 ? monthCombo.getSelectedIndex() : null;
+        monthChart.setFilter(yearFilter, monthFilter);
     }
 
     /**
