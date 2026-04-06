@@ -28,7 +28,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * A fixed-size heatmap chart with five rows of seven cells, representing the days
+ * A fixed-size heatmap chart with six rows of seven cells, representing the days
  * of a calendar month, broken into weeks. Each row represents the days of a single
  * week, ranging from Sunday on the left up to Saturday on the right.
  * (We use the North American convention of Sunday as first day, ignoring ISO-8601).
@@ -60,7 +60,7 @@ public class MonthChart extends JPanel {
 
     private final List<Note> allNotes;
     private final List<Integer> uniqueYears;
-    private final ValueCell[][] cells = new ValueCell[5][7];
+    private final ValueCell[][] cells = new ValueCell[6][7];
     private final boolean empty;
     private Integer yearFilter = null;
     private Integer monthFilter = null;
@@ -157,7 +157,7 @@ public class MonthChart extends JPanel {
         // Now we can color the cells based on the min/max word count observed for this month:
         Color coldColor = StatisticsExtension.getColdColor();
         Color hotColor = StatisticsExtension.getHotColor();
-        for (int row = 0; row < 5; row++) {
+        for (int row = 0; row < 6; row++) {
             for (int col = 0; col < 7; col++) {
                 ValueCell cell = cells[row][col];
                 int wordCount = cell.getValue();
@@ -179,7 +179,7 @@ public class MonthChart extends JPanel {
     }
 
     /**
-     * Creates our fixed-size layout with 5 rows of 7 columns, and fills each cell
+     * Creates our fixed-size layout with 6 rows of 7 columns, and fills each cell
      * with the "no data" color for a default starting position.
      */
     private void buildHeatmapLayout() {
@@ -189,7 +189,7 @@ public class MonthChart extends JPanel {
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbc.insets = new Insets(0, 0, 0, 0);
-        for (int row = 0; row < 5; row++) {
+        for (int row = 0; row < 6; row++) {
             for (int col = 0; col < 7; col++) {
                 cells[row][col] = new ValueCell("", noDataColor, 0, 42);
                 add(cells[row][col], gbc);
@@ -201,7 +201,7 @@ public class MonthChart extends JPanel {
 
         // Let's try to set our preferred size accurately:
         int cellSize = cells[0][0].getCellSize();
-        setPreferredSize(new Dimension(cellSize * 7, cellSize * 5));
+        setPreferredSize(new Dimension(cellSize * 7, cellSize * 6));
     }
 
     /**
@@ -209,7 +209,7 @@ public class MonthChart extends JPanel {
      */
     private void resetChart() {
         Color noDataColor = LookAndFeelManager.getLafColor("Panel.background", Color.LIGHT_GRAY);
-        for (int row = 0; row < 5; row++) {
+        for (int row = 0; row < 6; row++) {
             for (int col = 0; col < 7; col++) {
                 cells[row][col].setBackground(noDataColor);
                 cells[row][col].setToolTipText("");
