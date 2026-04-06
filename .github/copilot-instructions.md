@@ -39,7 +39,7 @@ The extension follows the Snotes plugin pattern: `StatisticsExtension` extends `
 
 **Chart components** (`charts/` package):
 - `ValueCell` — single 24×24px heatmap cell; blends between configurable cold/hot colors
-- `AllYearsChart`, `YearChart`, `WeekChart` — compose `ValueCell` instances; accept shared min/max values so multiple charts use a synchronized color scale
+- `AllYearsChart`, `YearChart`, `WeekChart` — compose `ValueCell` instances to render heatmap-based views of statistics
 
 ## Key Conventions
 
