@@ -27,13 +27,13 @@ The extension follows the Snotes plugin pattern: `StatisticsExtension` extends `
 **Data flow:**
 1. User triggers the Statistics action → `StatisticsLoaderThread` starts
 2. Loader runs **6 parallel worker tasks** via `ExecutorService`: general counts, per-year, all-months, per-year+month, day-of-week, and phrase extraction
-3. Results collected into the immutable `Statistics` model
+3. Results collected into the `Statistics` model
 4. `StatisticsDialog` renders 4 tabs: Overview, Years, Weeks, Phrases — each backed by custom heatmap chart components in the `charts/` subpackage
 
 **Key classes:**
 - `StatisticsUtil` — static analysis algorithms (word counting, phrase extraction, value normalization)
 - `StatisticsLoaderThread` — background worker; extends `SimpleProgressWorker` from the Snotes framework
-- `Statistics` — immutable data bag passed from loader to dialog
+- `Statistics` — data bag with final fields passed from loader to dialog
 - `PhraseList` — wraps `List<Phrase>` with a `filter(n, minPhraseLength)` method that sorts by frequency (tiebreaker: longer phrase wins)
 - `Phrase` — Java `record`; immutable value object
 
