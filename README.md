@@ -132,15 +132,39 @@ The same color scheme is applied to all heatmaps in the dialog, so you only need
 
 ## How do I get it?
 
-The easiest way is to select the "Extension Manager" action from the "Options" group in the left action panel.
-Visit the "available" tab, and find "Statistics" in the list on the left. An "Install" button will appear
-in the top right. Click it, and the extension will be downloaded and installed. You will be prompted to
+Start by installing the [Snotes](https://github.com/scorbo2/snotes/) application, if you haven't already.
+Then, you can install this extension directly from within the application.
+
+The easiest way to install the extension is to select the "Extension Manager" action from the "Options" group in the
+left action panel. Visit the "available" tab, and find "Statistics" in the list on the left. An "Install" button will
+appear in the top right. Click it, and the extension will be downloaded and installed. You will be prompted to
 restart the application, and once you do, the new "Statistics" action group will be available in the left action panel.
 
 To uninstall the extension later, go back to the Extension Manager dialog, and find "Statistics" on the "Installed"
 tab. An "Uninstall" button will appear in the top right. Click it, and the extension will be uninstalled. You will be
 prompted to restart the application, and once you do, the "Statistics" action group will be removed from the
 left action panel.
+
+### Alternatively: build from source and install manually
+
+If you have Java 17 and Maven installed, you can build this extension from source, and install the jar manually.
+
+```shell
+git clone https://github.com/scorbo2/ext-sn-statistics.git
+cd ext-sn-statistics
+
+# This builds the jar file:
+mvn clean package
+
+# Now we can copy it into place manually.
+# The default location is ".Snotes/extensions" in your home directory:
+rm ~/.Snotes/extensions/ext-sn-statistics-*.jar # optionally remove any older version of the jar first
+cp target/ext-sn-statistics-*.jar ~/.Snotes/extensions
+```
+
+Now, restart Snotes (if it was running), and the jar will be picked up automatically on next launch!
+
+To uninstall the extension, just delete the jar file from the extensions directory, and restart Snotes.
 
 ## Bug reports and feature requests
 
