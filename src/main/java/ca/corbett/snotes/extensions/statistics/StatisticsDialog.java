@@ -217,6 +217,12 @@ public class StatisticsDialog extends JDialog {
         panelField.getPanel().add(monthChart);
         formPanel.add(panelField);
 
+        // No sense allowing filter options if there's nothing to filter:
+        if (monthChart.isEmpty()) {
+            monthCombo.setEnabled(false);
+            yearCombo.setEnabled(false);
+        }
+
         return formPanel;
     }
 
