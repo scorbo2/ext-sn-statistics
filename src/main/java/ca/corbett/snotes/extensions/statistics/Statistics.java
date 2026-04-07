@@ -31,6 +31,7 @@ public class Statistics {
     private final Map<Integer, Integer> noteCountByDayOfWeek; // day of week (1-7) -> total notes on that day (all years)
     private final PhraseList allPhrases; // all phrases of length 2-10 across all notes, sorted by frequency
     private final Map<Integer, List<Phrase>> phrasesByLength; // phrase length -> list of phrases of that length
+    private final WordList topWords; // The top N words across all notes, sorted by frequency.
 
     public Statistics(List<Note> allNotes, int totalNoteCount, int totalWordCount, List<Integer> uniqueYears,
                       Map<Integer, Integer> wordCountByYear, Map<Integer, Integer> noteCountByYear,
@@ -38,7 +39,7 @@ public class Statistics {
                       Map<Integer, Map<Integer, Integer>> wordCountByYearAndMonth,
                       Map<Integer, Map<Integer, Integer>> noteCountByYearAndMonth,
                       Map<Integer, Integer> wordCountByDayOfWeek, Map<Integer, Integer> noteCountByDayOfWeek,
-                      PhraseList allPhrases, Map<Integer, List<Phrase>> phrasesByLength) {
+                      PhraseList allPhrases, Map<Integer, List<Phrase>> phrasesByLength, WordList topWords) {
         this.allNotes = allNotes;
         this.totalNoteCount = totalNoteCount;
         this.totalWordCount = totalWordCount;
@@ -53,6 +54,7 @@ public class Statistics {
         this.noteCountByDayOfWeek = noteCountByDayOfWeek;
         this.allPhrases = allPhrases;
         this.phrasesByLength = phrasesByLength;
+        this.topWords = topWords;
     }
 
     public List<Note> getAllNotes() {
@@ -177,5 +179,9 @@ public class Statistics {
 
     public Map<Integer, List<Phrase>> getPhrasesByLength() {
         return phrasesByLength;
+    }
+
+    public WordList getTopWords() {
+        return topWords;
     }
 }

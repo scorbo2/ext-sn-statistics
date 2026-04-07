@@ -16,7 +16,6 @@ public class PhraseList {
 
     /**
      * Constructs a PhraseList with the given list of phrases.
-     * @param phrases
      */
     public PhraseList(List<Phrase> phrases) {
         this.phrases = phrases == null ? List.of() : phrases; // default to empty list if null
