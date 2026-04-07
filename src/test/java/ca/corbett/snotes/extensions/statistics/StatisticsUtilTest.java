@@ -371,7 +371,7 @@ class StatisticsUtilTest {
 
     @Test
     public void findWords_shouldIgnoreShortWords() {
-        // GIVEN notes where all recurring words are shorter than MIN_WORD_LENGTH (4 chars):
+        // GIVEN notes where all recurring words are shorter than MIN_WORD_LENGTH:
         Note note1 = new Note();
         note1.setText("the cat sat on the mat");
         Note note2 = new Note();
