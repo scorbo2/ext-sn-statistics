@@ -23,7 +23,7 @@ This gives you a quick visual overview of when you were most productive. The col
 See the "configuration options" section below. Hovering over any cell in the heatmap will show a tooltip
 with the exact count of notes, and count of words, for that year.
 
-Note that if you have fewer than three unique years of notes, the heatmap chart will be replaced with a
+Note that if you have fewer than four unique years of notes, the heatmap chart will be replaced with a
 simple label-based display, with one line of text summarizing each year.
 
 ### Tab 2: Notes by year
@@ -68,7 +68,7 @@ Tuesday holds the record for "most words written". Also note that the weekdays a
 are blue. Clearly, this user is more productive during the week than on the weekend! Hover over the cells
 to see the exact counts for each day of the week.
 
-### Tab 4: Most common phrases
+### Tab 5: Most common phrases
 
 ![Most common phrases](screenshots/tab5_phrases.jpg)
 
@@ -80,7 +80,7 @@ this does not yield terribly interesting results - we see the most frequent two-
 But, the phrase length chooser allows you to look for phrases up to 10 words in length, which will certainly
 yield more interesting results.
 
-### Tab 4: Most common words
+### Tab 6: Most common words
 
 ![Most common words](screenshots/tab6_words.jpg)
 
