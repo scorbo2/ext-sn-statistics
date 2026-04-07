@@ -5,8 +5,10 @@ import ca.corbett.snotes.model.Query;
 
 import java.time.DayOfWeek;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Handy utility methods for gathering statistics from lists of notes.
@@ -19,6 +21,8 @@ public class StatisticsUtil {
     public static final int MIN_PHRASE_LENGTH = 2; // a phrase must be at least 2 words long to be interesting
     public static final int MAX_PHRASE_LENGTH = 10; // very rare we'd get more than 10 words in a common phrase
     public static final int MIN_PHRASE_FREQUENCY = 2; // single-occurrence phrases are not interesting and are very expensive to store
+    public static final int MIN_WORD_LENGTH = 5; // short words are very common and not interesting: a, an, the, that...
+    public static final int TOP_N_WORDS = 25; // Completely arbitrary choice: top 25 words.
 
     /**
      * ISO-8601 defines Monday as the first day of the week (1) and Sunday as the last day of the week (7).
@@ -110,6 +114,94 @@ public class StatisticsUtil {
     }
 
     /**
+     * Returns a WordList containing the top N most common words across the given list of notes,
+     * along with their occurrence counts.
+     */
+    public static WordList findWords(List<Note> notes, int N) {
+        return findWords(notes, null, N);
+    }
+
+    /**
+     * Returns a WordList containing the top N most common words across the given list of notes,
+     * only considering the given specific words, and ignoring all others. You can pass null
+     * or an empty set for specificWords to consider all words, in which case, this is
+     * equivalent to findWords(List&lt;Note&gt;, int).
+     * <p>
+     * Note: MIN_WORD_LENGTH is ignored if you pass in specificWords to search for!
+     * The unique word count feature will still work, though.
+     * </p>
+     */
+    public static WordList findWords(List<Note> notes, Set<String> specificWords, int N) {
+        if (notes == null || notes.isEmpty() || N <= 0) {
+            return new WordList(null); // default to empty list if null or invalid N
+        }
+        if (specificWords == null) {
+            specificWords = Set.of(); // default to empty set if null
+        }
+
+        Map<String, Integer> wordCounts = new HashMap<>();
+        Set<String> uniqueWords = new HashSet<>(); // tracks total unique words scanned, for the uniqueWordCount feature
+        for (Note note : notes) {
+
+            // Cache getText() to avoid repeated virtual calls:
+            String noteText = note == null ? null : note.getText();
+
+            // Skip null notes, and notes with no text:
+            if (noteText == null || noteText.isBlank()) {
+                continue;
+            }
+
+            // Normalize the text and ensure we have something left to work with after normalization:
+            String text = normalizeText(noteText);
+            if (text.isBlank()) {
+                continue;
+            }
+
+            // Now we can split on whitespace:
+            String[] words = text.split("\\s+");
+            for (String word : words) {
+                uniqueWords.add(word); // track this word, even if it's a short one.
+
+                // Are we only considering specific words?
+                if (!specificWords.isEmpty()) {
+                    if (specificWords.contains(word)) {
+                        wordCounts.put(word, wordCounts.getOrDefault(word, 0) + 1);
+                    }
+                    continue; // skip the rest of this loop
+                }
+
+                // We are considering all words. But, we should
+                // skip short words when counting occurrences, since they are very
+                // common and not interesting: a, an, the, but, etc.
+                if (word.length() < MIN_WORD_LENGTH) {
+                    continue;
+                }
+                wordCounts.put(word, wordCounts.getOrDefault(word, 0) + 1);
+            }
+        }
+
+        // Prune all single-occurrence words before materializing into a list.
+        // In large datasets, they are the overwhelming majority of map entries,
+        // which may cause an OutOfMemoryException during .toList().
+        // Note: we re-use MIN_PHRASE_FREQUENCY here. It serves the same purpose.
+        // Also note: we don't do this prune if we were given specific words to search for.
+        // That's because our list will be MUCH smaller, and we want to count even single occurrences:
+        if (specificWords.isEmpty()) {
+            wordCounts.values().removeIf(count -> count < MIN_PHRASE_FREQUENCY);
+        }
+
+        // Convert to WordList and return, sorted by count descending:
+        return new WordList(wordCounts.entrySet()
+                                      .stream()
+                                      .map(entry -> new Word(entry.getKey(), entry.getValue()))
+                                      .sorted((w1, w2) -> Integer.compare(w2.occurrenceCount(),
+                                                                          w1.occurrenceCount())) // sort by count, descending
+                                      .limit(N)
+                                      .toList(),
+                            uniqueWords.size()); // total unique words scanned, for the uniqueWordCount feature
+    }
+
+    /**
      * Given a list of notes, finds all phrases of length 2 to MAX_PHRASE_LENGTH that appear
      * in the text of those notes, and counts how many times each phrase appears.
      * <p>
@@ -155,22 +247,8 @@ public class StatisticsUtil {
                 continue;
             }
 
-            // Single-pass normalization: lowercase + replace non-word chars with spaces.
-            // This replaces the two-pass approach (toLowerCase then replaceAll) with one
-            // character-level loop, avoiding a second full scan and regex overhead.
-            StringBuilder normalized = new StringBuilder(noteText.length());
-            for (int ci = 0; ci < noteText.length(); ci++) {
-                char c = noteText.charAt(ci);
-                if (Character.isLetterOrDigit(c) || c == '\'') {
-                    normalized.append(Character.toLowerCase(c));
-                }
-                else {
-                    normalized.append(' ');
-                }
-            }
-            String text = normalized.toString().trim();
-
-            // If the normalization left us with nothing, then we have no phrases to count:
+            // Normalize the text and ensure we have something left to work with after normalization:
+            String text = normalizeText(noteText);
             if (text.isBlank()) {
                 continue;
             }
@@ -210,6 +288,34 @@ public class StatisticsUtil {
                                                                entry.getValue()[0],
                                                                entry.getValue()[1]))
                                       .toList());
+    }
+
+    /**
+     * Performs a single-pass normalization of the given text, converting it to lowercase and
+     * replacing all non-word characters (except apostrophes) with spaces. This replaces the
+     * old two-pass approach of using toLowerCase() followed by replaceAll(), which required
+     * two full scans of the text and incurred regex overhead.
+     *
+     * @param text Any text string.
+     * @return A normalized version of the given text. Might be empty if normalization stripped everything.
+     */
+    public static String normalizeText(String text) {
+        if (text == null || text.isEmpty()) {
+            return ""; // easy check
+        }
+
+        int len = text.length();
+        StringBuilder normalized = new StringBuilder(len);
+        for (int ci = 0; ci < len; ci++) {
+            char c = text.charAt(ci);
+            if (Character.isLetterOrDigit(c) || c == '\'') {
+                normalized.append(Character.toLowerCase(c));
+            }
+            else {
+                normalized.append(' ');
+            }
+        }
+        return normalized.toString().trim();
     }
 
     /**

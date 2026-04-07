@@ -55,6 +55,7 @@ public class StatisticsLoaderThread extends SimpleProgressWorker {
     private Map<Integer, Integer> noteCountByDayOfWeek; // day of week (1-7) -> total notes on that day (all years)
     private PhraseList allPhrases; // all phrases of length 2-10 across all notes, sorted by frequency
     private Map<Integer, List<Phrase>> phrasesByLength; // phrase length -> list of phrases of that length
+    private WordList topWords; // the top N words across all notes, sorted by frequency
 
     public StatisticsLoaderThread(DataManager dataManager) {
         this.dataManager = dataManager;
@@ -83,7 +84,8 @@ public class StatisticsLoaderThread extends SimpleProgressWorker {
                               wordCountByDayOfWeek,
                               noteCountByDayOfWeek,
                               allPhrases,
-                              phrasesByLength);
+                              phrasesByLength,
+                              topWords);
     }
 
     @Override
@@ -96,6 +98,7 @@ public class StatisticsLoaderThread extends SimpleProgressWorker {
         workers.add(this::loadMonthData);
         workers.add(this::loadWeekData);
         workers.add(this::loadPhrases);
+        workers.add(this::loadWords);
 
         // we do one pass to find all phrases, then one pass per phrase length to filter them:
         int phraseSteps = (StatisticsUtil.MAX_PHRASE_LENGTH - StatisticsUtil.MIN_PHRASE_LENGTH);
@@ -251,5 +254,19 @@ public class StatisticsLoaderThread extends SimpleProgressWorker {
             phrasesByLength.put(length, allPhrases.filter(10, length));
             chunkComplete();
         }
+    }
+
+    /**
+     * Finds the top N words of at least MIN_WORD_LENGTH across all notes, and counts their frequencies.
+     */
+    void loadWords() {
+        Stopwatch.start("loadWords");
+        List<Note> allNotes = dataManager.getNotes();
+        topWords = StatisticsUtil.findWords(allNotes, StatisticsUtil.TOP_N_WORDS);
+        chunkComplete();
+        Stopwatch.stop("loadWords");
+        log.info("StatisticsLoaderThread: loadWords: took "
+                         + Stopwatch.reportFormatted("loadWords")
+                         + " to load top words");
     }
 }

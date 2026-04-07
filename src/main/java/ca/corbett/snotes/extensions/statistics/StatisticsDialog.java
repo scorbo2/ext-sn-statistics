@@ -1,16 +1,24 @@
 package ca.corbett.snotes.extensions.statistics;
 
+import ca.corbett.extras.EnhancedAction;
+import ca.corbett.extras.MessageUtil;
 import ca.corbett.extras.ScrollUtil;
+import ca.corbett.extras.progress.MultiProgressDialog;
+import ca.corbett.extras.progress.SimpleProgressAdapter;
 import ca.corbett.forms.Alignment;
 import ca.corbett.forms.FormPanel;
+import ca.corbett.forms.fields.ButtonField;
 import ca.corbett.forms.fields.ComboField;
 import ca.corbett.forms.fields.LabelField;
 import ca.corbett.forms.fields.PanelField;
+import ca.corbett.forms.fields.ShortTextField;
 import ca.corbett.snotes.Resources;
 import ca.corbett.snotes.extensions.statistics.charts.AllYearsChart;
 import ca.corbett.snotes.extensions.statistics.charts.MonthChart;
 import ca.corbett.snotes.extensions.statistics.charts.WeekChart;
 import ca.corbett.snotes.extensions.statistics.charts.YearChart;
+import ca.corbett.snotes.model.Tag;
+import ca.corbett.snotes.model.TagList;
 import ca.corbett.snotes.ui.MainWindow;
 
 import javax.swing.BorderFactory;
@@ -20,6 +28,7 @@ import javax.swing.JLabel;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
+import javax.swing.SwingUtilities;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -27,12 +36,16 @@ import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.event.ActionEvent;
 import java.time.DayOfWeek;
 import java.time.Month;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.logging.Logger;
 
 /**
  * Provides a JTabbedPane-based dialog for showing various statistics about the user's notes.
@@ -42,6 +55,8 @@ import java.util.Locale;
  */
 public class StatisticsDialog extends JDialog {
 
+    private final Logger log = Logger.getLogger(StatisticsDialog.class.getName());
+
     private static final int DIALOG_WIDTH = 600;
     private final Statistics stats;
     private ComboField<String> monthCombo;
@@ -49,6 +64,9 @@ public class StatisticsDialog extends JDialog {
     private MonthChart monthChart;
     private ComboField<Integer> phraseLengthCombo;
     private final LabelField[] phraseLabels = new LabelField[10];
+    private FormPanel wordSearchForm;
+    private ShortTextField wordSearchField;
+    private MessageUtil messageUtil;
 
     /**
      * Creates a StatisticsDialog using the given Statistics instance as the source of all
@@ -72,6 +90,7 @@ public class StatisticsDialog extends JDialog {
         tabPane.addTab("Months", ScrollUtil.buildScrollPane(buildMonthsTab()));
         tabPane.addTab("Weeks", ScrollUtil.buildScrollPane(buildWeeksTab()));
         tabPane.addTab("Phrases", ScrollUtil.buildScrollPane(buildPhrasesTab()));
+        tabPane.addTab("Words", ScrollUtil.buildScrollPane(buildWordsTab()));
 
         setLayout(new BorderLayout());
         add(tabPane, BorderLayout.CENTER);
@@ -312,8 +331,127 @@ public class StatisticsDialog extends JDialog {
         // Otherwise, load them up (they are already in descending order):
         for (int i = 0; i < filtered.size() && i < phraseLabels.length; i++) {
             Phrase phrase = filtered.get(i);
-            String label = String.format("<html><b>%s</b> (used %,d times)</html>", phrase.phrase(), phrase.occurrenceCount());
+            String label = String.format("<html>%d. <b>%s</b> (used %,d times)</html>", (i + 1), phrase.phrase(),
+                                         phrase.occurrenceCount());
             phraseLabels[i].setText(label);
+        }
+    }
+
+    /**
+     * Builds out our "Top N Words" tab, showing the most common words across all notes and their occurrence counts.
+     * Also provides a control to allow an on-the-fly search for specific word(s).
+     */
+    private JComponent buildWordsTab() {
+        wordSearchForm = new FormPanel(Alignment.TOP_LEFT);
+        wordSearchForm.setBorderMargin(8);
+        wordSearchForm.add(LabelField.createBoldHeaderLabel("Most common words"));
+
+        WordList topWords = stats.getTopWords();
+
+        // If the "total unique words" feature is enabled, show that count here.
+        if (topWords.getUniqueWordCount() != WordList.NO_DATA) {
+            wordSearchForm.add(
+                    new LabelField(String.format("You've typed a total of %,d unique words across all your notes.",
+                                                 topWords.getUniqueWordCount())));
+        }
+
+        if (topWords.getWords().isEmpty()) {
+            wordSearchForm.add(new LabelField("(no data)"));
+            return wordSearchForm; // Don't show the rest if there's nothing to work with.
+        }
+
+        // Show a label for each one. The list should already be sorted in descending order.
+        // We don't know exactly how many entries there will be here, but it should be reasonable
+        // enough to just show inline like this:
+        int number = 1;
+        for (Word word : topWords.getWords()) {
+            String label = String.format("<html>%d. <b>%s</b> (used %,d times)</html>", number, word.word(),
+                                         word.occurrenceCount());
+            LabelField labelField = new LabelField(label);
+            labelField.getMargins().setLeft(20); // indent the list a bit
+            wordSearchForm.add(labelField);
+            number++;
+        }
+
+        wordSearchForm.add(LabelField.createBoldHeaderLabel("Word search", 14));
+        wordSearchField = new ShortTextField("Search for word(s):", 20);
+        wordSearchField.setAllowBlank(false);
+        wordSearchField.setHelpText("Enter a comma-separated list of 1-25 words to search for.");
+        wordSearchForm.add(wordSearchField);
+
+        wordSearchForm.add(new ButtonField(List.of(new WordSearchAction())));
+
+        return wordSearchForm;
+    }
+
+    /**
+     * Shows the result of a word search in an info dialog.
+     */
+    private void showWordSearchResults(WordList foundWords) {
+        if (foundWords == null) {
+            getMessageUtil().error("Word search error", "An unexpected error occurred while searching for words.");
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder("Search results:\n\n");
+        int totalOccurrences = foundWords.getWords().stream().mapToInt(Word::occurrenceCount).sum();
+        sb.append(String.format("Found %,d combined occurrences across all notes.\n\n", totalOccurrences));
+        int num = 1;
+        for (Word word : foundWords.getWords()) {
+            // This list might be smaller than we expect! Not all words may have been found.
+            // Any word not mentioned here has zero occurrences, and we can just ignore it in the results.
+            // If no word was found, the label above will show "0 combined occurrences", which is fine.
+            sb.append(String.format("  %d. %s: %,d occurrences\n", num, word.word(), word.occurrenceCount()));
+            num++;
+        }
+        getMessageUtil().info("Word search results", sb.toString());
+    }
+
+    private MessageUtil getMessageUtil() {
+        if (messageUtil == null) {
+            messageUtil = new MessageUtil(this, log);
+        }
+        return messageUtil;
+    }
+
+    /**
+     * Invoked when the user clicks the "Search" button on the Words tab. This will kick off a WordSearchThread
+     * to do the actual searching, and will show a progress dialog while the search is underway.
+     * A dialog with the results is shown upon completion.
+     */
+    private class WordSearchAction extends EnhancedAction {
+
+        private WordSearchAction() {
+            super("Search");
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if (!wordSearchForm.isFormValid()) {
+                return; // field was left blank - user must fill it in first
+            }
+
+            // This is of course not a TagList, but TagList conveniently already
+            // has parsing logic for turning a comma-separated string into a list of normalized,
+            // de-duplicated, non-blank items, so let's use it:
+            TagList tagList = TagList.fromRawString(wordSearchField.getText());
+
+            // Convert to a set for findWords():
+            Set<String> wordSet = new HashSet<>(tagList.getTags().size());
+            for (Tag tag : tagList.getTags()) {
+                wordSet.add(tag.getTag());
+            }
+
+            // Fire off a worker thread to do the loading off the Swing EDT:
+            WordSearchThread worker = new WordSearchThread(stats.getAllNotes(), wordSet);
+            worker.addProgressListener(new SimpleProgressAdapter() {
+                @Override
+                public void progressComplete() {
+                    SwingUtilities.invokeLater(() -> showWordSearchResults(worker.getResults()));
+                }
+            });
+            MultiProgressDialog dialog = new MultiProgressDialog(StatisticsDialog.this, "Searching for words...");
+            dialog.runWorker(worker, true);
         }
     }
 }

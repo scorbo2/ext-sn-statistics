@@ -8,6 +8,7 @@ import ca.corbett.snotes.model.filter.YearFilter;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -270,5 +271,498 @@ class StatisticsUtilTest {
 
         // THEN no phrases should be returned because all note text is whitespace:
         assertTrue(result.getPhrases().isEmpty());
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // findWords tests
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @Test
+    public void findWords_withNullNotes_shouldReturnEmptyWordList() {
+        // GIVEN a null note list:
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(null, 10);
+
+        // THEN we should get an empty word list:
+        assertTrue(result.getWords().isEmpty());
+    }
+
+    @Test
+    public void findWords_withEmptyNotes_shouldReturnEmptyWordList() {
+        // GIVEN an empty note list:
+        List<Note> notes = List.of();
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(notes, 10);
+
+        // THEN we should get an empty word list:
+        assertTrue(result.getWords().isEmpty());
+    }
+
+    @Test
+    public void findWords_withZeroN_shouldReturnEmptyWordList() {
+        // GIVEN a note with repeating content:
+        Note note = new Note();
+        note.setText("hello world hello world");
+
+        // WHEN we call findWords with N = 0:
+        WordList result = StatisticsUtil.findWords(List.of(note), 0);
+
+        // THEN the result should be empty because N=0 means "return nothing":
+        assertTrue(result.getWords().isEmpty());
+    }
+
+    @Test
+    public void findWords_withNegativeN_shouldReturnEmptyWordList() {
+        // GIVEN a note with repeating content:
+        Note note = new Note();
+        note.setText("hello world hello world");
+
+        // WHEN we call findWords with a negative N:
+        WordList result = StatisticsUtil.findWords(List.of(note), -1);
+
+        // THEN the result should be empty because N <= 0 is invalid:
+        assertTrue(result.getWords().isEmpty());
+    }
+
+    @Test
+    public void findWords_withNullNoteText_shouldBeIgnored() {
+        // GIVEN a note with null text alongside a note with valid repeating text:
+        Note nullTextNote = new Note();
+        nullTextNote.setText(null);
+        Note realNote = new Note();
+        realNote.setText("hello world hello world");
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(nullTextNote, realNote), 10);
+
+        // THEN the null-text note should be silently ignored,
+        // and words from the real note should still be found:
+        assertFalse(result.getWords().isEmpty());
+    }
+
+    @Test
+    public void findWords_withOnlyPunctuation_shouldReturnEmptyWordList() {
+        // GIVEN a note that contains only punctuation:
+        Note note = new Note();
+        note.setText("!@#$%^&*()");
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(note), 10);
+
+        // THEN it should return an empty word list, because there are no actual words:
+        assertTrue(result.getWords().isEmpty());
+    }
+
+    @Test
+    public void findWords_withWhitespaceOnlyNotes_shouldReturnEmptyWordList() {
+        // GIVEN notes with non-empty but whitespace-only text:
+        Note note1 = new Note();
+        note1.setText("   ");
+        Note note2 = new Note();
+        note2.setText("\t\n");
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), 10);
+
+        // THEN no words should be returned because all note text is whitespace:
+        assertTrue(result.getWords().isEmpty());
+    }
+
+    @Test
+    public void findWords_shouldIgnoreShortWords() {
+        // GIVEN notes where all recurring words are shorter than MIN_WORD_LENGTH:
+        Note note1 = new Note();
+        note1.setText("the cat sat on the mat");
+        Note note2 = new Note();
+        note2.setText("the cat sat on the mat");
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), 10);
+
+        // THEN short words like "the", "cat", "sat", "on" should be ignored
+        // because they are shorter than MIN_WORD_LENGTH:
+        assertTrue(result.getWords().stream().noneMatch(w -> w.word().length() < StatisticsUtil.MIN_WORD_LENGTH),
+                   "No words shorter than MIN_WORD_LENGTH should be returned");
+    }
+
+    @Test
+    public void findWords_shouldPruneSingleOccurrenceWords() {
+        // GIVEN notes where every long-enough word appears exactly once:
+        Note note1 = new Note();
+        note1.setText("alpha bravo charlie delta");
+        Note note2 = new Note();
+        note2.setText("echo foxtrot golf hotel");
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), 10);
+
+        // THEN the result should be empty because all words occur only once:
+        assertTrue(result.getWords().isEmpty());
+    }
+
+    @Test
+    public void findWords_shouldStripPunctuationAndNormalizeToLowercase() {
+        // GIVEN four notes each containing "hello" and "world" with different cases and punctuation:
+        Note note1 = new Note();
+        note1.setText("Hello, World!");
+        Note note2 = new Note();
+        note2.setText("hello world!");
+        Note note3 = new Note();
+        note3.setText("HELLO WORLD.");
+        Note note4 = new Note();
+        note4.setText("hello, world");
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2, note3, note4), 10);
+
+        // THEN punctuation should be stripped and text normalized to lowercase,
+        // so all four occurrences of each word count towards the same normalized form:
+        List<Word> words = result.getWords();
+        assertTrue(words.stream().anyMatch(w -> w.word().equals("hello") && w.occurrenceCount() == 4),
+                   "Expected \"hello\" with occurrence count 4");
+        assertTrue(words.stream().anyMatch(w -> w.word().equals("world") && w.occurrenceCount() == 4),
+                   "Expected \"world\" with occurrence count 4");
+    }
+
+    @Test
+    public void findWords_shouldPreserveApostrophes() {
+        // GIVEN notes where words contain apostrophes:
+        Note note1 = new Note();
+        note1.setText("isn't that amazing isn't that amazing");
+        Note note2 = new Note();
+        note2.setText("isn't that amazing");
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), 10);
+
+        // THEN apostrophes should be preserved so "isn't" is treated as one word:
+        List<Word> words = result.getWords();
+        assertTrue(words.stream().anyMatch(w -> w.word().equals("isn't")),
+                   "Expected \"isn't\" to be present as a single word");
+        assertFalse(words.stream().anyMatch(w -> w.word().equals("isn") || w.word().equals("t")),
+                    "Apostrophe should not cause \"isn't\" to be split into \"isn\" and \"t\"");
+    }
+
+    @Test
+    public void findWords_shouldReturnWordsInDecreasingOrderOfOccurrence() {
+        // GIVEN notes where "hello" appears more often than "world" and "world" more than "amazing":
+        Note note1 = new Note();
+        note1.setText("hello hello hello world world amazing");
+        Note note2 = new Note();
+        note2.setText("hello hello world amazing");
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), 10);
+
+        // THEN words should be returned in decreasing order of occurrence count:
+        List<Word> words = result.getWords();
+        assertFalse(words.isEmpty());
+        for (int i = 0; i < words.size() - 1; i++) {
+            assertTrue(words.get(i).occurrenceCount() >= words.get(i + 1).occurrenceCount(),
+                       "Words should be in decreasing order of occurrence count");
+        }
+        assertEquals("hello", words.get(0).word());
+    }
+
+    @Test
+    public void findWords_shouldLimitResultsToN() {
+        // GIVEN a note with several recurring long words:
+        Note note1 = new Note();
+        note1.setText("alpha bravo charlie delta echo foxtrot");
+        Note note2 = new Note();
+        note2.setText("alpha bravo charlie delta echo foxtrot");
+
+        // WHEN we call findWords with N = 3:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), 3);
+
+        // THEN at most 3 words should be returned:
+        assertTrue(result.getWords().size() <= 3,
+                   "Result should contain at most N=3 words");
+    }
+
+    @Test
+    public void findWords_withNGreaterThanAvailableWords_shouldReturnAllAvailableWords() {
+        // GIVEN a note where only 2 long words recur:
+        Note note1 = new Note();
+        note1.setText("hello world");
+        Note note2 = new Note();
+        note2.setText("hello world");
+
+        // WHEN we call findWords requesting more than the number of available recurring words:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), 100);
+
+        // THEN we should get back only the 2 available recurring words (not an error):
+        assertEquals(2, result.getWords().size());
+    }
+
+    @Test
+    public void findWords_shouldCountAcrossMultipleNotes() {
+        // GIVEN the same word spread across multiple notes:
+        Note note1 = new Note();
+        note1.setText("hello there");
+        Note note2 = new Note();
+        note2.setText("hello again");
+        Note note3 = new Note();
+        note3.setText("hello everyone");
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2, note3), 10);
+
+        // THEN "hello" should be counted 3 times (once per note):
+        List<Word> words = result.getWords();
+        assertTrue(words.stream().anyMatch(w -> w.word().equals("hello") && w.occurrenceCount() == 3),
+                   "Expected \"hello\" with occurrence count 3 across all notes");
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // findWords - unique word count tests
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @Test
+    public void findWords_withNullNotes_shouldReturnNoDataForUniqueWordCount() {
+        // GIVEN a null note list:
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(null, 10);
+
+        // THEN uniqueWordCount should be NO_DATA because no scanning was performed:
+        assertEquals(WordList.NO_DATA, result.getUniqueWordCount());
+    }
+
+    @Test
+    public void findWords_withEmptyNotes_shouldReturnNoDataForUniqueWordCount() {
+        // GIVEN an empty note list:
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(), 10);
+
+        // THEN uniqueWordCount should be NO_DATA because no scanning was performed:
+        assertEquals(WordList.NO_DATA, result.getUniqueWordCount());
+    }
+
+    @Test
+    public void findWords_withZeroN_shouldReturnNoDataForUniqueWordCount() {
+        // GIVEN a note with text:
+        Note note = new Note();
+        note.setText("hello world hello world");
+
+        // WHEN we call findWords with N = 0:
+        WordList result = StatisticsUtil.findWords(List.of(note), 0);
+
+        // THEN uniqueWordCount should be NO_DATA because we bailed out early:
+        assertEquals(WordList.NO_DATA, result.getUniqueWordCount());
+    }
+
+    @Test
+    public void findWords_shouldTrackUniqueWordCount() {
+        // GIVEN a note with three distinct words:
+        Note note = new Note();
+        note.setText("alpha bravo charlie");
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(note), 10);
+
+        // THEN the unique word count should reflect all three distinct words seen:
+        assertEquals(3, result.getUniqueWordCount());
+    }
+
+    @Test
+    public void findWords_shouldIncludeShortWordsInUniqueWordCount() {
+        // GIVEN a note where some words are shorter than MIN_WORD_LENGTH ("the", "cat"):
+        Note note = new Note();
+        note.setText("the cat sits");
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(note), 10);
+
+        // THEN short words should NOT appear in the returned word list (they are filtered),
+        // but they SHOULD still be counted in the unique word count:
+        assertTrue(result.getWords().stream().noneMatch(w -> w.word().equals("the") || w.word().equals("cat")),
+                   "Short words should be excluded from the returned word list");
+        assertEquals(3, result.getUniqueWordCount(),
+                     "Short words should still be counted in the unique word count");
+    }
+
+    @Test
+    public void findWords_shouldIncludeSingleOccurrenceWordsInUniqueWordCount() {
+        // GIVEN two notes where all long words appear only once (and are therefore pruned from results):
+        Note note1 = new Note();
+        note1.setText("alpha bravo charlie");
+        Note note2 = new Note();
+        note2.setText("delta echo foxtrot");
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), 10);
+
+        // THEN no words should be returned (all single-occurrence), but the unique word
+        // count should still reflect all 6 distinct words that were scanned:
+        assertTrue(result.getWords().isEmpty(),
+                   "All single-occurrence words should be pruned from results");
+        assertEquals(6, result.getUniqueWordCount(),
+                     "All scanned words should be counted in unique word count even if pruned from results");
+    }
+
+    @Test
+    public void findWords_shouldDeduplicateUniqueWordsAcrossNotes() {
+        // GIVEN the same word appearing in two separate notes:
+        Note note1 = new Note();
+        note1.setText("hello world");
+        Note note2 = new Note();
+        note2.setText("hello world");
+
+        // WHEN we call findWords:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), 10);
+
+        // THEN the unique word count should be 2 (not 4), since "hello" and "world"
+        // are the same two unique words regardless of how many notes contain them:
+        assertEquals(2, result.getUniqueWordCount(),
+                     "Unique word count should deduplicate the same word seen in multiple notes");
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // findWords(List<Note>, Set<String>, int) - specific-words overload tests
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @Test
+    public void findWords_withSpecificWords_shouldCountOnlyWordsInTheSet() {
+        // GIVEN notes that contain several recurring words:
+        Note note1 = new Note();
+        note1.setText("hello world today hello world today");
+        Note note2 = new Note();
+        note2.setText("hello world today");
+
+        // AND we only want to count "hello":
+        Set<String> specificWords = Set.of("hello");
+
+        // WHEN we call the specific-words overload:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), specificWords, 10);
+
+        // THEN only "hello" should be present in the result:
+        List<Word> words = result.getWords();
+        assertEquals(1, words.size(), "Only the specified word should be returned");
+        assertEquals("hello", words.get(0).word());
+        assertEquals(3, words.get(0).occurrenceCount());
+    }
+
+    @Test
+    public void findWords_withSpecificWords_shouldIgnoreMinWordLength() {
+        // GIVEN notes with a short recurring word that would normally be filtered by MIN_WORD_LENGTH:
+        Note note1 = new Note();
+        note1.setText("the cat sat");
+        Note note2 = new Note();
+        note2.setText("the cat sat");
+
+        // AND we explicitly ask for "the" (which is shorter than MIN_WORD_LENGTH):
+        Set<String> specificWords = Set.of("the");
+
+        // WHEN we call the specific-words overload:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), specificWords, 10);
+
+        // THEN "the" should be counted even though it is shorter than MIN_WORD_LENGTH:
+        List<Word> words = result.getWords();
+        assertTrue(words.stream().anyMatch(w -> w.word().equals("the") && w.occurrenceCount() == 2),
+                   "Words shorter than MIN_WORD_LENGTH should be counted when listed in specificWords");
+    }
+
+    @Test
+    public void findWords_withSpecificWords_shouldIgnoreWordsNotInTheSet() {
+        // GIVEN notes containing both "hello" and "world", recurring multiple times:
+        Note note1 = new Note();
+        note1.setText("hello world hello world");
+        Note note2 = new Note();
+        note2.setText("hello world");
+
+        // AND we only ask for "hello":
+        Set<String> specificWords = Set.of("hello");
+
+        // WHEN we call the specific-words overload:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), specificWords, 10);
+
+        // THEN "world" should NOT appear in the results, even though it recurs:
+        List<Word> words = result.getWords();
+        assertTrue(words.stream().noneMatch(w -> w.word().equals("world")),
+                   "Words not in the specificWords set should be excluded from results");
+    }
+
+    @Test
+    public void findWords_withNullSpecificWords_shouldBehaveLikeGeneralOverload() {
+        // GIVEN a note with recurring long words:
+        Note note1 = new Note();
+        note1.setText("hello world hello world");
+        Note note2 = new Note();
+        note2.setText("hello world");
+
+        // WHEN we call the specific-words overload with null:
+        WordList withNull = StatisticsUtil.findWords(List.of(note1, note2), null, 10);
+
+        // AND we call the general overload for comparison:
+        WordList withoutSet = StatisticsUtil.findWords(List.of(note1, note2), 10);
+
+        // THEN both should return the same words and counts:
+        assertEquals(withoutSet.getWords().size(), withNull.getWords().size());
+        for (int i = 0; i < withoutSet.getWords().size(); i++) {
+            assertEquals(withoutSet.getWords().get(i).word(), withNull.getWords().get(i).word());
+            assertEquals(withoutSet.getWords().get(i).occurrenceCount(), withNull.getWords().get(i).occurrenceCount());
+        }
+    }
+
+    @Test
+    public void findWords_withEmptySpecificWords_shouldBehaveLikeGeneralOverload() {
+        // GIVEN a note with recurring long words:
+        Note note1 = new Note();
+        note1.setText("hello world hello world");
+        Note note2 = new Note();
+        note2.setText("hello world");
+
+        // WHEN we call the specific-words overload with an empty set:
+        WordList withEmpty = StatisticsUtil.findWords(List.of(note1, note2), Set.of(), 10);
+
+        // AND we call the general overload for comparison:
+        WordList withoutSet = StatisticsUtil.findWords(List.of(note1, note2), 10);
+
+        // THEN both should return the same words and counts:
+        assertEquals(withoutSet.getWords().size(), withEmpty.getWords().size());
+        for (int i = 0; i < withoutSet.getWords().size(); i++) {
+            assertEquals(withoutSet.getWords().get(i).word(), withEmpty.getWords().get(i).word());
+            assertEquals(withoutSet.getWords().get(i).occurrenceCount(), withEmpty.getWords().get(i).occurrenceCount());
+        }
+    }
+
+    @Test
+    public void findWords_withSpecificWords_shouldStillTrackUniqueWordCount() {
+        // GIVEN notes with several distinct words:
+        Note note1 = new Note();
+        note1.setText("hello world today");
+        Note note2 = new Note();
+        note2.setText("hello world tomorrow");
+
+        // AND we only ask for "hello":
+        Set<String> specificWords = Set.of("hello");
+
+        // WHEN we call the specific-words overload:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), specificWords, 10);
+
+        // THEN the unique word count should reflect ALL distinct words scanned (4),
+        // not just the words in the specific set (1):
+        assertEquals(4, result.getUniqueWordCount(),
+                     "Unique word count should track all scanned words, even when specificWords is used");
+    }
+
+    @Test
+    public void findWords_withSpecificWordNotPresentInNotes_shouldReturnEmptyWordList() {
+        // GIVEN notes that do not contain the requested word at all:
+        Note note1 = new Note();
+        note1.setText("hello world hello world");
+        Note note2 = new Note();
+        note2.setText("hello world");
+
+        // AND we ask for a word that does not appear in any note:
+        Set<String> specificWords = Set.of("elephant");
+
+        // WHEN we call the specific-words overload:
+        WordList result = StatisticsUtil.findWords(List.of(note1, note2), specificWords, 10);
+
+        // THEN the returned word list should be empty:
+        assertTrue(result.getWords().isEmpty(),
+                   "Word list should be empty when the specified word does not appear in any note");
     }
 }
