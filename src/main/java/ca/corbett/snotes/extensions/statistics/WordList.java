@@ -47,8 +47,8 @@ public class WordList {
 
     /**
      * Returns the total number of unique words that were scanned in all notes.
-     * This might be NO_DATA if the feature is disabled.
-     * This might legitimately be zero, if the given list of notes was empty.
+     * This is {@link #NO_DATA} if the feature was not populated, including when the
+     * current statistics workflow is given null or empty notes.
      */
     public int getUniqueWordCount() {
         return uniqueWordCount;
