@@ -14,6 +14,7 @@ import ca.corbett.snotes.extensions.SnotesExtension;
 import ca.corbett.snotes.ui.MainWindow;
 import ca.corbett.snotes.ui.actions.ActionGroup;
 
+import javax.swing.SwingUtilities;
 import java.awt.Color;
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
@@ -45,7 +46,7 @@ public class StatisticsExtension extends SnotesExtension {
 
     private MessageUtil messageUtil;
     private static final Object lockObject = new Object();
-    private static volatile boolean loading;
+    private static boolean loading;
     private static Statistics statistics;
 
     /**
@@ -90,7 +91,9 @@ public class StatisticsExtension extends SnotesExtension {
      * Returns true if a StatisticsLoaderThread is currently running and loading statistics data, false otherwise.
      */
     public static boolean isLoading() {
-        return loading;
+        synchronized(lockObject) {
+            return loading;
+        }
     }
 
     /**
@@ -105,7 +108,7 @@ public class StatisticsExtension extends SnotesExtension {
             loading = false;
         }
         if (showDialogOnComplete && stats != null) {
-            new StatisticsDialog(stats).setVisible(true);
+            SwingUtilities.invokeLater(() -> new StatisticsDialog(stats).setVisible(true));
         }
     }
 
@@ -182,11 +185,22 @@ public class StatisticsExtension extends SnotesExtension {
 
         @Override
         public void actionPerformed(ActionEvent e) {
+            synchronized(lockObject) {
+                // If a load is already in progress, do nothing - the user has clicked the
+                // action link multiple times. They must wait, or cancel the load in progress.
+                if (loading) {
+                    log.warning("Ignoring request to refresh statistics because statistics are currently loading.");
+                    return;
+                }
+
+                // Disregard any currently cached statistics, and kick off a loader thread to load fresh statistics:
+                statistics = null;
+                loading = true;
+            }
             StatisticsLoaderThread loader = new StatisticsLoaderThread(MainWindow.getInstance().getDataManager());
             loader.addProgressListener(new ProgressListener(loader, false));
             String message = "Refreshing statistics";
             MultiProgressDialog dialog = new MultiProgressDialog(MainWindow.getInstance(), message);
-            loading = true;
             dialog.runWorker(loader, true);
         }
     }
@@ -210,15 +224,20 @@ public class StatisticsExtension extends SnotesExtension {
                 return;
             }
 
-            // If a load is already in progress, do nothing - the user has clicked the
-            // action link multiple times. They must wait, or cancel the load in progress.
-            if (isLoading()) {
-                log.warning("Ignoring request to show statistics dialog because statistics are currently loading.");
-                return;
+            synchronized(lockObject) {
+                // If a load is already in progress, do nothing - the user has clicked the
+                // action link multiple times. They must wait, or cancel the load in progress.
+                if (loading) {
+                    log.warning("Ignoring request to show statistics dialog because statistics are currently loading.");
+                    return;
+                }
+
+                // Clear any cached stats (should be none, but let's be sure), and mark ourselves as loading:
+                statistics = null;
+                loading = true;
             }
 
             // Otherwise, let's load them now, and show the dialog when complete:
-            loading = true;
             StatisticsLoaderThread loader = new StatisticsLoaderThread(MainWindow.getInstance().getDataManager());
             loader.addProgressListener(new ProgressListener(loader, true));
             String message = "Gathering statistics";
@@ -228,10 +247,10 @@ public class StatisticsExtension extends SnotesExtension {
     }
 
     /**
-     * Listens to our loader thread, and shows the StatisticsDialog when loading is complete.
+     * Listens to our loader thread, and optionally shows the StatisticsDialog when loading is complete.
      * Our progress dialog will be visible while the loader is running, and the user will have
      * a "cancel" button they can use if the loader runs too long. If we detect a cancel event,
-     * we simply do nothing here. User can try again later.
+     * we null out our cached statistics and show a cancel confirmation message to the user.
      */
     private class ProgressListener extends SimpleProgressAdapter {
 
@@ -246,7 +265,8 @@ public class StatisticsExtension extends SnotesExtension {
         @Override
         public void progressCanceled() {
             setStatistics(null, false);
-            getMessageUtil().info("Canceled", "Statistics gathering was canceled.");
+            SwingUtilities.invokeLater(() -> getMessageUtil().info("Canceled",
+                                                                   "Statistics gathering was canceled."));
         }
 
         @Override
@@ -254,7 +274,8 @@ public class StatisticsExtension extends SnotesExtension {
             setStatistics(loader.getStatistics(), showDialogOnComplete);
 
             if (!showDialogOnComplete) {
-                getMessageUtil().info("Completed", "Statistics refresh is complete!");
+                SwingUtilities.invokeLater(() -> getMessageUtil().info("Completed",
+                                                                       "Statistics refresh is complete!"));
             }
         }
     }
