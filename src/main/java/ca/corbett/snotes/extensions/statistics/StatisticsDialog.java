@@ -376,7 +376,7 @@ public class StatisticsDialog extends JDialog {
         wordSearchForm.add(LabelField.createBoldHeaderLabel("Word search", 14));
         wordSearchField = new ShortTextField("Search for word(s):", 20);
         wordSearchField.setAllowBlank(false);
-        wordSearchField.setHelpText("Enter a comma-separated list of words to search for, or a single word.");
+        wordSearchField.setHelpText("Enter a comma-separated list of 1-25 words to search for.");
         wordSearchForm.add(wordSearchField);
 
         wordSearchForm.add(new ButtonField(List.of(new WordSearchAction())));
