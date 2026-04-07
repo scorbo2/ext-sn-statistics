@@ -124,12 +124,12 @@ public class StatisticsUtil {
     /**
      * Returns a WordList containing the top N most common words across the given list of notes,
      * only considering the given specific words, and ignoring all others. You can pass null
-     * or an empty list for specificWords to consider all words, in which case, this is
+     * or an empty set for specificWords to consider all words, in which case, this is
      * equivalent to findWords(List&lt;Note&gt;, int).
      * <p>
      * Note: MIN_WORD_LENGTH is ignored if you pass in specificWords to search for!
      * The unique word count feature will still work, though.
-     * </P>
+     * </p>
      */
     public static WordList findWords(List<Note> notes, Set<String> specificWords, int N) {
         if (notes == null || notes.isEmpty() || N <= 0) {
