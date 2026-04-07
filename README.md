@@ -58,7 +58,7 @@ will show a heatmap in calendar format, with one cell for each day of that month
 Note that unlike ISO-8601, the calendar heatmap displayed here starts with Sunday as the first day of the
 week, and ends with Saturday as the last day of the week, following the North American standard.
 
-### Tab 3: Notes by day of week
+### Tab 4: Notes by day of week
 
 ![Notes by day of week](screenshots/tab4_dow.jpg)
 
@@ -80,11 +80,11 @@ this does not yield terribly interesting results - we see the most frequent two-
 But, the phrase length chooser allows you to look for phrases up to 10 words in length, which will certainly
 yield more interesting results.
 
-### Tab 5: Most common words
+### Tab 4: Most common words
 
 ![Most common words](screenshots/tab6_words.jpg)
 
-Here, you will see a count of the total unique words you've written across all words. But wait, didn't we
+Here, you will see a count of the total unique words you've written across all notes. But wait, didn't we
 see that on tab 1? Not quite! On tab 1, we see the total word count across all notes. Here, we see the total
 *unique* word count, with duplicates removed. The example above shows `41,030` unique words, which is a pretty
 good vocabulary!
